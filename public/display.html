@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Photo Booth</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Screens ─────────────────────────────────────────── */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* ── Idle screen ─────────────────────────────────────── */
+    #idle-screen {
+      gap: 16px;
+    }
+    .qr-box {
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-box img {
+      width: 220px;
+      height: 220px;
+      display: block;
+    }
+    .idle-headline {
+      font-size: clamp(40px, 6vw, 72px);
+      font-weight: 700;
+      letter-spacing: -1px;
+      text-align: center;
+    }
+    .idle-sub {
+      font-size: clamp(18px, 2.5vw, 28px);
+      color: #aaa;
+      text-align: center;
+    }
+    .scan-arrow {
+      font-size: 28px;
+      color: #aaa;
+      animation: bounce 1.6s ease-in-out infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-10px); }
+    }
+
+    /* ── Countdown screen ────────────────────────────────── */
+    #countdown-screen {
+      background: #0a0a0a;
+    }
+    .countdown-number {
+      font-size: clamp(160px, 30vw, 340px);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -8px;
+      color: #fff;
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  opacity 0.15s ease;
+    }
+    .countdown-number.pop {
+      transform: scale(1.18);
+    }
+    .countdown-label {
+      font-size: clamp(28px, 4vw, 48px);
+      color: #666;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+
+    /* ── Flash overlay ───────────────────────────────────── */
+    #flash {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 100;
+      transition: opacity 0.06s ease-out;
+    }
+    #flash.on {
+      opacity: 1;
+      transition: none;
+    }
+
+    /* ── Preview strip screen ────────────────────────────── */
+    #preview-screen {
+      flex-direction: row;
+      gap: 12px;
+      padding: 40px;
+    }
+    .preview-slot {
+      flex: 1;
+      max-width: 340px;
+      aspect-ratio: 3/4;
+      background: #1a1a1a;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #222;
+      transition: border-color 0.3s;
+    }
+    .preview-slot.filled {
+      border-color: #fff;
+    }
+    .preview-slot img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .preview-slot .empty-icon {
+      font-size: 48px;
+      color: #333;
+    }
+
+    /* ── Status / sending screen ─────────────────────────── */
+    #status-screen {
+      gap: 20px;
+    }
+    .status-icon {
+      font-size: 72px;
+    }
+    .status-text {
+      font-size: clamp(24px, 3.5vw, 42px);
+      font-weight: 500;
+      color: #ccc;
+      text-align: center;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid #333;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Done screen ─────────────────────────────────────── */
+    #done-screen {
+      gap: 20px;
+    }
+    .done-name {
+      font-size: clamp(40px, 6vw, 80px);
+      font-weight: 700;
+    }
+    .done-sub {
+      font-size: clamp(18px, 2.5vw, 30px);
+      color: #888;
+    }
+    .done-check {
+      font-size: 80px;
+    }
+
+    /* ── Error screen ────────────────────────────────────── */
+    #error-screen { gap: 16px; }
+    .error-text {
+      font-size: 28px;
+      color: #e05555;
+      text-align: center;
+    }
+    .error-sub {
+      font-size: 18px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Flash overlay -->
+  <div id="flash"></div>
+
+  <!-- 1. Idle — shown when waiting for a guest -->
+  <div id="idle-screen" class="screen active">
+    <div class="idle-headline">Strike a pose. 📸</div>
+    <div class="scan-arrow">↓</div>
+    <div class="idle-sub">Scan the QR code to get started</div>
+    <div class="qr-box">
+      <!-- Replace qr.png with the QR code image pointing to http://YOUR_IP:3000/form -->
+      <img src="qr.png" alt="QR code" onerror="this.style.cssText='width:220px;height:220px;background:#eee'"/>
+    </div>
+    <div class="idle-sub" style="font-size:16px;color:#555">http://<span id="local-ip">your-mac-ip</span>:3000/form</div>
+  </div>
+
+  <!-- 2. Countdown -->
+  <div id="countdown-screen" class="screen">
+    <div class="countdown-label">Get ready</div>
+    <div class="countdown-number" id="countdown-number">3</div>
+  </div>
+
+  <!-- 3. Live preview strip (fills as shots are taken) -->
+  <div id="preview-screen" class="screen">
+    <div class="preview-slot" id="slot-1"><span class="empty-icon">○</span></div>
+    <div class="preview-slot" id="slot-2"><span class="empty-icon">○</span></div>
+    <div class="preview-slot" id="slot-3"><span class="empty-icon">○</span></div>
+  </div>
+
+  <!-- 4. Status / sending -->
+  <div id="status-screen" class="screen">
+    <div class="spinner"></div>
+    <div class="status-text" id="status-text">Building your strip…</div>
+  </div>
+
+  <!-- 5. Done -->
+  <div id="done-screen" class="screen">
+    <div class="done-check">✓</div>
+    <div class="done-name" id="done-name">Done!</div>
+    <div class="done-sub">Check your phone or inbox for your strip.</div>
+  </div>
+
+  <!-- 6. Error -->
+  <div id="error-screen" class="screen">
+    <div class="error-text" id="error-text">Something went wrong.</div>
+    <div class="error-sub">Please try again!</div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let previewCount = 0;
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // ── Socket events ─────────────────────────────────────
+    socket.on('countdown', ({ count }) => {
+      showScreen('countdown-screen');
+      const el = document.getElementById('countdown-number');
+      el.textContent = count;
+      // Pop animation
+      el.classList.remove('pop');
+      void el.offsetWidth; // reflow
+      el.classList.add('pop');
+      setTimeout(() => el.classList.remove('pop'), 300);
+    });
+
+    socket.on('flash', () => {
+      const f = document.getElementById('flash');
+      f.classList.add('on');
+      setTimeout(() => f.classList.remove('on'), 120);
+    });
+
+    socket.on('preview', ({ path }) => {
+      showScreen('preview-screen');
+      previewCount++;
+      const slot = document.getElementById(`slot-${previewCount}`);
+      if (slot) {
+        slot.innerHTML = `<img src="${path}" alt="Shot ${previewCount}"/>`;
+        slot.classList.add('filled');
+      }
+    });
+
+    socket.on('status', ({ message }) => {
+      showScreen('status-screen');
+      document.getElementById('status-text').textContent = message;
+    });
+
+    socket.on('done', ({ name }) => {
+      document.getElementById('done-name').textContent = `${name}!`;
+      showScreen('done-screen');
+      // Return to idle after 8 seconds
+      setTimeout(() => {
+        previewCount = 0;
+        // Reset preview slots
+        for (let i = 1; i <= 3; i++) {
+          const slot = document.getElementById(`slot-${i}`);
+          slot.innerHTML = '<span class="empty-icon">○</span>';
+          slot.classList.remove('filled');
+        }
+        showScreen('idle-screen');
+      }, 8000);
+    });
+
+    socket.on('error', ({ message }) => {
+      document.getElementById('error-text').textContent = message;
+      showScreen('error-screen');
+      setTimeout(() => {
+        previewCount = 0;
+        showScreen('idle-screen');
+      }, 6000);
+    });
+
+    // ── Show local IP in idle screen ──────────────────────
+    fetch('/api/ip').then(r => r.json()).then(d => {
+      if (d.ip) document.getElementById('local-ip').textContent = d.ip;
+    }).catch(() => {});
+  </script>
+</body>
+</html>

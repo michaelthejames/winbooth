@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Photo Booth — Sign In</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #181818;
+      --border: #2a2a2a;
+      --text: #f0f0f0;
+      --muted: #888;
+      --accent: #ffffff;
+      --accent-text: #000;
+      --danger: #e05555;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px 40px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .header-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      font-size: 26px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      font-size: 15px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ── Form ───────────────────────────────────────────── */
+    .field {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"] {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 16px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    input:focus {
+      border-color: #555;
+    }
+    input.error {
+      border-color: var(--danger);
+    }
+    input::placeholder {
+      color: #444;
+    }
+
+    /* ── Delivery toggle ─────────────────────────────────── */
+    .delivery-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .delivery-option {
+      position: relative;
+    }
+    .delivery-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .delivery-option label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 16px 12px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 400;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .delivery-option label .icon {
+      font-size: 26px;
+    }
+    .delivery-option input:checked + label {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Conditional fields ──────────────────────────────── */
+    .conditional {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+    }
+    .conditional.visible {
+      max-height: 120px;
+      opacity: 1;
+    }
+
+    /* ── Submit button ───────────────────────────────────── */
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--accent);
+      color: var(--accent-text);
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.2s, transform 0.1s;
+      -webkit-appearance: none;
+    }
+    .submit-btn:active {
+      transform: scale(0.98);
+      opacity: 0.85;
+    }
+    .submit-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── Success state ───────────────────────────────────── */
+    #success-view {
+      display: none;
+      text-align: center;
+      padding: 40px 0;
+    }
+    #success-view .success-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    #success-view h2 {
+      font-size: 28px;
+      font-weight: 600;
+    }
+    #success-view p {
+      font-size: 16px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    /* ── Error message ───────────────────────────────────── */
+    .form-error {
+      background: rgba(224, 85, 85, 0.12);
+      border: 1px solid rgba(224, 85, 85, 0.3);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: var(--danger);
+      margin-bottom: 16px;
+      display: none;
+    }
+    .form-error.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- Form view -->
+    <div id="form-view">
+      <div class="header">
+        <div class="header-icon">📸</div>
+        <h1>Photo Booth</h1>
+        <p>Three shots. One strip. All yours.</p>
+      </div>
+
+      <div class="form-error" id="form-error"></div>
+
+      <div class="field">
+        <label for="name">Your name</label>
+        <input type="text" id="name" name="name" placeholder="First name is fine" autocomplete="given-name"/>
+      </div>
+
+      <div class="field">
+        <label>Send my strip via</label>
+        <div class="delivery-toggle">
+          <div class="delivery-option">
+            <input type="radio" id="del-email" name="delivery" value="email" checked/>
+            <label for="del-email">
+              <span class="icon">✉️</span>
+              Email
+            </label>
+          </div>
+          <div class="delivery-option">
+            <input type="radio" id="del-sms" name="delivery" value="sms"/>
+            <label for="del-sms">
+              <span class="icon">💬</span>
+              Text message
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="conditional visible" id="email-field">
+        <div class="field">
+          <label for="email">Email address</label>
+          <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email"/>
+        </div>
+      </div>
+
+      <div class="conditional" id="phone-field">
+        <div class="field">
+          <label for="phone">Mobile number</label>
+          <input type="tel" id="phone" name="phone" placeholder="+1 (555) 000-0000" autocomplete="tel"/>
+        </div>
+      </div>
+
+      <button class="submit-btn" id="submit-btn" type="button">
+        Let's go →
+      </button>
+    </div>
+
+    <!-- Success view -->
+    <div id="success-view">
+      <div class="success-icon">🎉</div>
+      <h2>Get ready, <span id="success-name"></span>!</h2>
+      <p>Look at the screen and smile in 3… 2… 1…</p>
+    </div>
+  </div>
+
+  <script>
+    const emailRadio = document.getElementById('del-email');
+    const smsRadio   = document.getElementById('del-sms');
+    const emailField = document.getElementById('email-field');
+    const phoneField = document.getElementById('phone-field');
+    const submitBtn  = document.getElementById('submit-btn');
+    const formError  = document.getElementById('form-error');
+
+    // Toggle delivery fields
+    function updateDeliveryFields() {
+      const isSMS = smsRadio.checked;
+      emailField.classList.toggle('visible', !isSMS);
+      phoneField.classList.toggle('visible', isSMS);
+    }
+
+    emailRadio.addEventListener('change', updateDeliveryFields);
+    smsRadio.addEventListener('change', updateDeliveryFields);
+
+    // Submit
+    submitBtn.addEventListener('click', async () => {
+      const name     = document.getElementById('name').value.trim();
+      const delivery = smsRadio.checked ? 'sms' : 'email';
+      const email    = document.getElementById('email').value.trim();
+      const phone    = document.getElementById('phone').value.trim();
+
+      // Client-side validation
+      if (!name) {
+        showError('Please enter your name.');
+        document.getElementById('name').classList.add('error');
+        return;
+      }
+      if (delivery === 'email' && !email) {
+        showError('Please enter your email address.');
+        document.getElementById('email').classList.add('error');
+        return;
+      }
+      if (delivery === 'sms' && !phone) {
+        showError('Please enter your mobile number.');
+        document.getElementById('phone').classList.add('error');
+        return;
+      }
+
+      hideError();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+
+      try {
+        const res = await fetch('/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, delivery, email, phone }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('success-name').textContent = name.split(' ')[0];
+          document.getElementById('form-view').style.display = 'none';
+          document.getElementById('success-view').style.display = 'block';
+        } else {
+          showError(data.error || 'Something went wrong. Please try again.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Let's go →';
+        }
+      } catch {
+        showError('Could not reach the booth. Make sure you're on the same Wi-Fi.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Let's go →';
+      }
+    });
+
+    function showError(msg) {
+      formError.textContent = msg;
+      formError.classList.add('visible');
+    }
+    function hideError() {
+      formError.classList.remove('visible');
+      document.querySelectorAll('input.error').forEach(el => el.classList.remove('error'));
+    }
+  </script>
+</body>
+</html>

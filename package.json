@@ -1,0 +1,24 @@
+{
+  "name": "photobooth",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/camera-addon",
+    "packages/api"
+  ],
+
+  "type": "module",
+
+  "scripts": {
+    "build:addon": "npm run build --workspace=packages/camera-addon",
+    "build:api": "npm run build --workspace=packages/api",
+    "build": "npm run build:addon && npm run build:api",
+    "start": "npm run start --workspace=packages/api",
+    "dev": "npm run dev --workspace=packages/api",
+    "start:prod": "npm run start:prod --workspace=packages/api"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
