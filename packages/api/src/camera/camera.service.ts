@@ -61,7 +61,15 @@ class PARSECSession implements CameraSession {
   if (dir) this.downloadDir = dir;
   await fs.mkdir(this.downloadDir, { recursive: true });
 
-  const parsecImagesDir = 'C:\\Users\\micha\\nodejs-canon-control-server\\public\\images';
+  const parsecImagesDir = path.join(
+  process.cwd(),
+  '..',
+  '..',
+  '..',
+  'parsec-server',
+  'public',
+  'images',
+);
 
   const url = `${this.parsecBaseUrl}/camera/${this.cameraIndex}/trigger`;
   const response = await fetch(url, { method: 'POST' });
