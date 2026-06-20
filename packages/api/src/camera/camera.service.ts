@@ -66,7 +66,7 @@ class PARSECSession implements CameraSession {
   '..',
   '..',
   '..',
-  'parsec-server',
+  'nodejs-canon-control-server',
   'public',
   'images',
 );
