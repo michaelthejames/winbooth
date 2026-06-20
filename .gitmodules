@@ -1,0 +1,3 @@
+[submodule "parsec-server"]
+	path = parsec-server
+	url = https://github.com/UWStout/nodejs-canon-control-server.git
