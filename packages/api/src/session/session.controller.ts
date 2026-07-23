@@ -1,7 +1,7 @@
 import {
   Controller, Post, Get, Body, BadRequestException, Logger, ConflictException,
 } from '@nestjs/common';
-import { IsEmail, IsEnum, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { IsEmail, IsOptional, IsString } from 'class-validator';
 import { SessionService } from './session.service';
 import { ObsService } from '../obs/obs.service';
 import {Param} from '@nestjs/common';
@@ -10,16 +10,8 @@ class StartSessionDto {
   @IsString()
   name: string;
 
-  @IsEnum(['email', 'sms'])
-  delivery: 'email' | 'sms';
-
-  @ValidateIf((o) => o.delivery === 'email')
   @IsEmail()
-  email?: string;
-
-  @ValidateIf((o) => o.delivery === 'sms')
-  @IsString()
-  phone?: string;
+  email: string;
 
   @IsOptional()
   cameraIndex?: number;

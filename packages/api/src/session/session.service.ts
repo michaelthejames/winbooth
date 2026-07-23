@@ -170,12 +170,12 @@ export class SessionService {
       });
 
       // 8. Switch back to Preview
-    try {
-      await this.obsService.setScene('Preview');
-      this.logger.log('[OBS] Switched back to Preview scene');
-    } catch (err) {
-      this.logger.warn('[OBS] Failed to switch to Preview', err);
-    }
+    //try {
+    //  await this.obsService.setScene('Preview');
+    //  this.logger.log('[OBS] Switched back to Preview scene');
+    //} catch (err) {
+    //  this.logger.warn('[OBS] Failed to switch to Preview', err);
+    //}
       // 9. Done
       this.setState(session, 'done');
 
@@ -276,48 +276,44 @@ private async buildStrip(
   stripsDir: string,
 ): Promise<string> {
   const stripPath = path.join(stripsDir, `${session.id}-strip.jpg`);
-  const logoPath = path.join(process.cwd(), '..', '..', 'public', 'logo.jpg');
 
-  // Build the strip (3 photos vertically)
-  let composite = sharp(session.capturedPaths[0])
-    .resize(800, 600, { fit: 'cover' })
-    .toBuffer();
+  // All photos are 800x600, stacked vertically = 800x1800
+  const photoWidth = 800;
+  const photoHeight = 600;
+  const totalHeight = photoHeight * 3;
 
-  for (let i = 1; i < 3; i++) {
-    const photo = sharp(session.capturedPaths[i])
-      .resize(800, 600, { fit: 'cover' })
-      .toBuffer();
-    
-    composite = sharp(await composite)
-      .extend({
-        bottom: 600,
-        background: { r: 0, g: 0, b: 0, alpha: 1 }
-      })
-      .composite([{
-        input: await photo,
-        top: i * 600,
-        left: 0
-      }])
-      .toBuffer();
-  }
+  // Create a black canvas
+  const canvas = Buffer.alloc(photoWidth * totalHeight * 3);
 
-  // Add logo to bottom right
-  const finalStrip = sharp(await composite)
-    .extend({
-      bottom: 100,  // Add space at bottom for logo
-      background: { r: 0, g: 0, b: 0, alpha: 1 }
-    })
-    .composite([{
-      input: logoPath,
-      top: 1800 + 20,  // 3 photos (1800px) + 20px padding
-      left: 800 - 180 - 20,  // Bottom right corner (180px logo width - 20px padding)
-    }])
+  // Load all photos as resized buffers
+  const photos = await Promise.all(
+    session.capturedPaths.map((filePath) =>
+      sharp(filePath)
+        .resize(photoWidth, photoHeight, { fit: 'cover' })
+        .raw()
+        .toBuffer(),
+    ),
+  );
+
+  // Composite all photos into canvas
+  const composites = photos.map((photoBuffer, index) => ({
+    input: photoBuffer,
+    raw: { width: photoWidth, height: photoHeight, channels: 3 },
+    top: index * photoHeight,
+    left: 0,
+  }));
+
+  // Build the strip
+  await sharp(canvas, {
+    raw: { width: photoWidth, height: totalHeight, channels: 3 },
+  })
+    .composite(composites)
     .jpeg({ quality: 90 })
     .toFile(stripPath);
 
+  this.logger.log(`[Strip] Composited to ${stripPath}`);
   return stripPath;
 }
-
   // ── Event helpers ──────────────────────────────────────────────────────────
 
   private setState(session: BoothSession, state: SessionState, payload?: Record<string, unknown>) {
