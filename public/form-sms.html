@@ -18,7 +18,7 @@
 
     body {
       font-family: 'melt', 'Arial', sans-serif;
-      background: transparent;
+      background: #0a0e27;
       background-image: 
         radial-gradient(circle at 20% 50%, rgba(139, 0, 139, 0.1) 0%, transparent 50%),
         radial-gradient(circle at 80% 80%, rgba(255, 0, 0, 0.05) 0%, transparent 50%);
@@ -74,9 +74,9 @@
       margin-bottom: 10px;
       color: #ff4444;
       text-shadow: 
-        0 0 5px #ff4444,
-        0 0 8px #270127,
-        2px 2px 0 #000;
+        0 0 2px #ff4444,
+        0 0 10px #8b008b,
+        2px 5px 0 #000;
       letter-spacing: 2px;
       position: relative;
       z-index: 1;
@@ -109,6 +109,7 @@
 
     input[type="text"],
     input[type="email"],
+    input[type="tel"],
     select {
       width: 100%;
       padding: 12px;
@@ -116,7 +117,7 @@
       border: 2px solid #8b008b;
       border-radius: 4px;
       color: #fff;
-      font-family: 'melt', sans-serif;
+      font-family: 'melt', 'Arial', sans-serif;
       font-size: 16px;
       box-shadow: inset 0 0 10px rgba(139, 0, 139, 0.2);
       transition: all 0.3s;
@@ -124,12 +125,56 @@
 
     input[type="text"]:focus,
     input[type="email"]:focus,
+    input[type="tel"]:focus,
     select:focus {
       outline: none;
       border-color: #ff4444;
       box-shadow: 
         inset 0 0 10px rgba(139, 0, 139, 0.2),
         0 0 10px #ff4444;
+    }
+
+    .radio-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .radio-option {
+      position: relative;
+    }
+
+    .radio-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+    }
+
+    .radio-option label {
+      display: block;
+      padding: 15px;
+      border: 2px solid #8b008b;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      margin-bottom: 0;
+      transition: all 0.3s;
+      background: rgba(30, 10, 50, 0.8);
+      text-shadow: none;
+    }
+
+    .radio-option input[type="radio"]:checked + label {
+      background: rgba(139, 0, 139, 0.5);
+      border-color: #ff4444;
+      color: #ffaaaa;
+      box-shadow: 0 0 15px #ff4444;
+    }
+
+    .delivery-details {
+      display: none;
+    }
+
+    .delivery-details.active {
+      display: block;
     }
 
     .submit-btn {
@@ -140,7 +185,7 @@
       border: 2px solid #ff4444;
       border-radius: 4px;
       font-family: 'melt', sans-serif;
-      font-size:24px;
+      font-size: 32px;
       font-weight: bold;
       cursor: pointer;
       transition: all 0.3s;
@@ -219,12 +264,26 @@
       color: #bb88bb;
       letter-spacing: 1px;
     }
+
+    fieldset {
+      border: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    legend {
+      color: #ff8888;
+      font-weight: bold;
+      margin-bottom: 15px;
+      letter-spacing: 1px;
+      text-shadow: 0 0 5px #ff4444;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>The Eye of Baphomet</h1>
-    <p class="subtitle">what will he see...</p>
+    <h1>PHOTO BOOTH</h1>
+    <p class="subtitle">CAPTURE YOUR SOUL...</p>
 
     <div id="message" class="message"></div>
 
@@ -234,32 +293,84 @@
         <input type="text" id="name" autocomplete="name" required>
       </div>
 
-      <div class="form-group">
-        <label for="email">EMAIL ADDRESS</label>
-        <input type="email" id="email" autocomplete="email" required placeholder="example@email.com">
+      <fieldset class="form-group">
+        <legend>HOW SHALL WE DELIVER YOUR CURSE?</legend>
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" id="delivery-email" name="delivery" value="email" checked>
+            <label for="delivery-email">CURSE BY EMAIL</label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="delivery-sms" name="delivery" value="sms">
+            <label for="delivery-sms">CURSE BY TEXT</label>
+          </div>
+        </div>
+      </fieldset>
+
+      <div id="emailSection" class="form-group delivery-details active">
+        <label for="email">EMAIL OF THE DAMNED</label>
+        <input type="email" id="email" autocomplete="email" placeholder="example@email.com">
       </div>
 
-      <button type="submit" class="submit-btn" id="submit-btn">let's begin...</button>
+      <div id="smsSection" class="form-group delivery-details" style="display:none;">
+        <label for="phone">PHONE NUMBER</label>
+        <input type="tel" id="phone" autocomplete="tel" placeholder="+1 (555) 123-4567" pattern="[0-9\+\-\(\)\s]+">
+      </div>
+
+      <button type="submit" class="submit-btn" id="submit-btn">SUMMON THE SPIRITS</button>
     </form>
 
     <div id="loading" class="loading">
       <div class="spinner"></div>
-      <p>SUMMONING THE SPIRITS...</p>
+      <p>are you ready?</p>
     </div>
   </div>
 
   <script>
+    function toggleDelivery() {
+  const delivery = document.querySelector('input[name="delivery"]:checked').value;
+  
+  if (delivery === 'email') {
+    document.getElementById('emailSection').style.display = 'block';
+    document.getElementById('smsSection').style.display = 'none';
+    document.getElementById('email').required = true;
+    document.getElementById('phone').required = false;
+  } else {
+    document.getElementById('emailSection').style.display = 'none';
+    document.getElementById('smsSection').style.display = 'block';
+    document.getElementById('email').required = false;
+    document.getElementById('phone').required = true;
+  }
+}
+
+    document.querySelectorAll('input[name="delivery"]').forEach(radio => {
+      radio.addEventListener('change', toggleDelivery);
+    });
+
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
       const name = document.getElementById('name').value;
+      const delivery = document.querySelector('input[name="delivery"]:checked').value;
       const email = document.getElementById('email').value;
+      const phone = document.getElementById('phone').value;
       
       // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        showMessage('Please enter a valid email address', 'error');
-        return;
+      if (delivery === 'email') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          showMessage('⚠️ Please enter a valid email address', 'error');
+          return;
+        }
+      }
+      
+      // Validate phone format
+      if (delivery === 'sms') {
+        const phoneRegex = /^[0-9\+\-\(\)\s]{10,}$/;
+        if (!phoneRegex.test(phone)) {
+          showMessage('⚠️ Please enter a valid phone number', 'error');
+          return;
+        }
       }
       
       try {
@@ -269,18 +380,13 @@
         const response = await fetch('/session/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            name, 
-            delivery: 'email', 
-            email,
-            phone: ''
-          })
+          body: JSON.stringify({ name, delivery, email, phone })
         });
         
         if (!response.ok) throw new Error('API error: ' + response.status);
         
-        // Show success screen
-        showSuccessScreen(email);
+        // Show success screen instead of redirecting
+        showSuccessScreen(delivery === 'email' ? email : phone, delivery);
       } catch (err) {
         const msg = document.getElementById('message');
         msg.textContent = '⚠️ ERROR: ' + err.message;
@@ -298,7 +404,7 @@
       msg.style.display = 'block';
     }
 
-    function showSuccessScreen(email) {
+    function showSuccessScreen(contact, method) {
       const form = document.getElementById('form');
       const loading = document.getElementById('loading');
       const message = document.getElementById('message');
@@ -316,10 +422,11 @@
         z-index: 1;
       `;
       
+      const methodText = method === 'email' ? 'email' : 'text message';
       successScreen.innerHTML = `
         <div style="font-size: 80px; margin-bottom: 20px;">✓</div>
         <h2 style="color: #88ff88; font-size: 32px; margin-bottom: 20px; text-shadow: 0 0 10px #00ff00;">YOUR PHOTOS ARE ON THE WAY!</h2>
-        <p style="color: #bb88bb; font-size: 18px; margin-bottom: 40px;">Check your email</p>
+        <p style="color: #bb88bb; font-size: 18px; margin-bottom: 40px;">Check your ${methodText}</p>
         <p style="color: #888; font-size: 14px;">Taking you back in a moment...</p>
       `;
       
@@ -341,8 +448,11 @@
       loading.style.display = 'none';
       document.getElementById('name').value = '';
       document.getElementById('email').value = '';
+      document.getElementById('phone').value = '';
+      document.getElementById('delivery').value = 'email';
       document.getElementById('message').style.display = 'none';
       document.getElementById('submit-btn').disabled = false;
+      toggleDelivery();
     }
   </script>
 </body>

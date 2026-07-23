@@ -4,9 +4,7 @@ import * as fs from 'fs/promises';
 
 export interface DeliveryOptions {
   name: string;
-  delivery: 'email' | 'sms';
-  email?: string;
-  phone?: string;
+  email: string;
   stripPath: string;
   sessionId: string;
 }
@@ -16,36 +14,19 @@ export class DeliveryService {
   private readonly logger = new Logger(DeliveryService.name);
   private resendApiKey: string;
   private fromEmail: string;
-  private twilio: any;
 
   constructor(private readonly config: ConfigService) {
     this.resendApiKey = this.config.get<string>('RESEND_API_KEY') || '';
     this.fromEmail = this.config.get<string>('FROM_EMAIL') || 'noreply@example.com';
-
-    // Twilio setup for SMS
-    if (
-      this.config.get<string>('TWILIO_ACCOUNT_SID') &&
-      this.config.get<string>('TWILIO_AUTH_TOKEN')
-    ) {
-      const twilio = require('twilio');
-      this.twilio = twilio(
-        this.config.get<string>('TWILIO_ACCOUNT_SID'),
-        this.config.get<string>('TWILIO_AUTH_TOKEN'),
-      );
-    }
   }
 
   async deliver(opts: DeliveryOptions): Promise<void> {
-    if (opts.delivery === 'email') {
-      await this.sendEmail(opts);
-    } else if (opts.delivery === 'sms') {
-      await this.sendSMS(opts);
-    }
+    await this.sendEmail(opts);
   }
 
   private async sendEmail(opts: DeliveryOptions): Promise<void> {
     if (!opts.email) {
-      throw new Error('Email address required for email delivery');
+      throw new Error('Email address required');
     }
 
     if (!this.resendApiKey) {
@@ -91,33 +72,6 @@ export class DeliveryService {
       this.logger.log(`Email sent to ${opts.email}`);
     } catch (err) {
       this.logger.error(`Failed to send email: ${err}`);
-      throw err;
-    }
-  }
-
-  private async sendSMS(opts: DeliveryOptions): Promise<void> {
-    if (!opts.phone) {
-      throw new Error('Phone number required for SMS delivery');
-    }
-
-    if (!this.twilio) {
-      throw new Error('Twilio not configured');
-    }
-
-    try {
-      const imageBuffer = await fs.readFile(opts.stripPath);
-      const base64Image = imageBuffer.toString('base64');
-
-      await this.twilio.messages.create({
-        body: `Hi ${opts.name}! Here's your photo booth strip.`,
-        from: this.config.get<string>('TWILIO_PHONE'),
-        to: opts.phone,
-        mediaUrl: `${this.config.get<string>('PUBLIC_BASE_URL')}/strips/${opts.sessionId}.jpg`,
-      });
-
-      this.logger.log(`SMS sent to ${opts.phone}`);
-    } catch (err) {
-      this.logger.error(`Failed to send SMS: ${err}`);
       throw err;
     }
   }

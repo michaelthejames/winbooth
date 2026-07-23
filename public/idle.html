@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      margin: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+    }
+    
+    .overlay {
+      text-align: center;
+      background: transparent;
+      padding: 40px;
+      border-radius: 10px;
+      color: #fff;
+    }
+    
+    .title {
+      font-size: 48px;
+      margin-bottom: 20px;
+      text-shadow: 0 0 10px #ff4444;
+      color: #ff8888;
+    }
+    
+    .instruction {
+      font-size: 28px;
+      letter-spacing: 2px;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <div class="title">the booth</div>
+    <div class="instruction">COMING SOON...</div>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        
+        try {
+          // Tell server to switch to Intake scene
+          const response = await fetch('/session/scene-change', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scene: 'Intake' })
+          });
+          
+          if (response.ok) {
+            console.log('Switched to Intake scene');
+          }
+        } catch (err) {
+          console.error('Failed to change scene:', err);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

@@ -21,23 +21,25 @@ export class BoothGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`Display disconnected: ${client.id}`);
   }
 
-  @OnEvent('booth.countdown')
+  @OnEvent('countdown')
   onCountdown(payload: unknown) {
+    console.log('[Gateway] Broadcasting countdown:', payload);
     this.server.emit('countdown', payload);
   }
 
-  @OnEvent('booth.flash')
+  @OnEvent('flash')
   onFlash(payload: unknown) {
     this.server.emit('flash', payload);
   }
 
-  @OnEvent('booth.preview')
+  @OnEvent('preview')
   onPreview(payload: unknown) {
     this.server.emit('preview', payload);
   }
 
-  @OnEvent('booth.stateChange')
+  @OnEvent('stateChange')
   onStateChange(payload: unknown) {
+    console.log('[Gateway] Broadcasting stateChange:', payload);
     this.server.emit('stateChange', payload);
   }
 }

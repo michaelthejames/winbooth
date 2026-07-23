@@ -3,10 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import * as sharp from 'sharp';
+const sharp = require('sharp');
 import { v4 as uuid } from 'uuid';
 import { CameraService } from '../camera/camera.service';
 import { DeliveryService } from '../delivery/delivery.service';
+import { ObsService } from '../obs/obs.service';
+
 
 // ── Session states ────────────────────────────────────────────────────────────
 export type SessionState =
@@ -21,9 +23,8 @@ export type SessionState =
 export interface BoothSession {
   id: string;
   name: string;
-  delivery: 'email' | 'sms';
   email?: string;
-  phone?: string;
+  shotNumber: number;
   state: SessionState;
   capturedPaths: string[];
   stripPath?: string;
@@ -33,9 +34,7 @@ export interface BoothSession {
 
 export interface StartSessionDto {
   name: string;
-  delivery: 'email' | 'sms';
   email?: string;
-  phone?: string;
   cameraIndex?: number;
 }
 
@@ -51,6 +50,7 @@ export class SessionService {
   constructor(
     private readonly cameraService: CameraService,
     private readonly deliveryService: DeliveryService,
+    private readonly obsService: ObsService,
     private readonly config: ConfigService,
     private readonly events: EventEmitter2,
   ) {}
@@ -74,12 +74,11 @@ export class SessionService {
     const session: BoothSession = {
       id: uuid(),
       name: dto.name,
-      delivery: dto.delivery,
       email: dto.email,
-      phone: dto.phone,
       state: 'countdown',
       capturedPaths: [],
       createdAt: new Date(),
+      shotNumber: 0,
     };
     this.activeSession = session;
 
@@ -97,11 +96,19 @@ export class SessionService {
 
   private async runSession(session: BoothSession, cameraIndex: number) {
     try {
+      this.logger.log(`[SESSION START] ${session.id}`);
+      this.logger.log(`[SESSION] obsService connected: ${this.obsService.isConnected()}`);
       const capturesDir = path.join(
         this.config.get<string>('app.capturesDir')!,
         session.id,
       );
+      const stripsDir = path.join(
+        this.config.get<string>('app.stripsDir')!,
+        session.id,
+      );
+      
       await fs.mkdir(capturesDir, { recursive: true });
+      await fs.mkdir(stripsDir, { recursive: true });
 
       // 1. Open camera session
       const cameras = await this.cameraService.listCameras();
@@ -110,35 +117,66 @@ export class SessionService {
 
       const nativeSession = await this.cameraService.openSession(
         camera.index,
-      capturesDir,
+        capturesDir,
       );
 
-      // 2. Shoot 3 photos with countdowns between each
+      // 2. Switch OBS to Countdown scene
+      try {
+        await this.obsService.setScene('Countdown');
+       this.logger.log('[OBS] Switched to Countdown scene');
+      } catch (err) {
+        this.logger.warn('[OBS] Failed to switch scene', err);
+       
+      }      // Clear the photo sources
+      await this.obsService.updateImageSource('photo-1', '');
+      await this.obsService.updateImageSource('photo-2', '');
+      await this.obsService.updateImageSource('photo-3', '');
+      // 3. Shoot 3 photos with countdowns between each
       for (let shot = 1; shot <= 3; shot++) {
         await this.runCountdown(session, shot);
         await this.takeShot(session, nativeSession, capturesDir, shot);
-      }
-
-      // 3. Close camera session
-      this.cameraService.closeActiveSession();
-
+}
       // 4. Composite strip
       this.setState(session, 'processing');
-      const stripPath = await this.buildStrip(session);
+      const stripPath = await this.buildStrip(session, capturesDir, stripsDir);
       session.stripPath = stripPath;
 
-      // 5. Deliver
+      // 6. Switch to Delivery scene and show strip
+    try {
+      await this.obsService.setScene('Delivery');
+      await this.obsService.updateImageSource('strip-image', stripPath);
+      this.logger.log(`[OBS] Switched to Delivery scene, showing strip`);
+    } catch (err) {
+      this.logger.warn('[OBS] Failed to show delivery scene', err);
+    }
+
+      // 6. Show strip for 5 seconds
+      await sleep(5000);
+
+      try {
+        await this.obsService.setScene('Idle');
+        this.logger.log('[OBS] Reset to Idle scene');
+        } catch (err) {
+        this.logger.warn('[OBS] Failed to reset to Idle', err);
+      }
+
+      // 7. Deliver
       this.setState(session, 'delivering');
       await this.deliveryService.deliver({
         name: session.name,
-        delivery: session.delivery,
         email: session.email,
-        phone: session.phone,
         stripPath,
         sessionId: session.id,
       });
 
-      // 6. Done
+      // 8. Switch back to Preview
+    try {
+      await this.obsService.setScene('Preview');
+      this.logger.log('[OBS] Switched back to Preview scene');
+    } catch (err) {
+      this.logger.warn('[OBS] Failed to switch to Preview', err);
+    }
+      // 9. Done
       this.setState(session, 'done');
 
       // Cleanup captures after a delay (keep the strip)
@@ -155,113 +193,146 @@ export class SessionService {
 
   private async runCountdown(session: BoothSession, shotNumber: number) {
     this.setState(session, 'countdown');
-    for (let i = 3; i >= 1; i--) {
-      this.emit('countdown', { count: i, shotNumber, total: 3, sessionId: session.id });
+    
+    if (shotNumber === 1) {
+    try {
+      await this.obsService.setScene('Countdown');
+      this.logger.log('[OBS] Switched to Countdown scene');
+    } catch (err) {
+      this.logger.warn('[OBS] Failed to switch to Countdown', err);
+    }
+  }  
+    
+    for (let count = 3; count >= 1; count--) {
+      this.logger.log(`[Countdown] ${count} for session ${session.id}`);
+      
+      // Update OBS countdown text overlay
+
+      // Emit countdown event for remote displays
+      this.emit('countdown', {
+        sessionId: session.id,
+        count,
+        shotNumber,
+        total: 3,
+      });
+
       await sleep(1000);
     }
-    this.emit('countdown', { count: 'SMILE!', shotNumber, total: 3, sessionId: session.id });
-    await sleep(600);
+
+    // SMILE!
+    this.logger.log(`[Countdown] SMILE! for session ${session.id}`);
+    
+
+    this.emit('countdown', {
+      sessionId: session.id,
+      count: 'SMILE!',
+      shotNumber,
+      total: 3,
+    });
+
+    await sleep(500); // Show SMILE! for half a second
   }
 
   // ── Capture ────────────────────────────────────────────────────────────────
 
   private async takeShot(
-  session: BoothSession,
-  nativeSession: ReturnType<CameraService['getActiveSession']>,
-  capturesDir: string,
-  shotNumber: number,
-): Promise<void> {
-  this.setState(session, 'shooting');
-  this.emit('flash', { sessionId: session.id });
+    session: BoothSession,
+    nativeSession: ReturnType<CameraService['getActiveSession']>,
+    capturesDir: string,
+    shotNumber: number,
+  ): Promise<void> {
+    this.setState(session, 'shooting');
+    this.emit('flash', { sessionId: session.id });
 
-  if (!nativeSession) {
-    throw new Error('No active camera session');
-  }
+    if (!nativeSession) {
+      throw new Error('No active camera session');
+    }
 
-  const filePath = await nativeSession.takePicture(capturesDir);
-
+    const filePath = await nativeSession.takePicture(capturesDir);
   session.capturedPaths.push(filePath);
 
-  this.emit('preview', {
+  const photoUrl = `/camera/captures/${session.id}/${path.basename(filePath)}`;
+
+this.emit('preview', {
     sessionId: session.id,
     shotNumber,
-    filePath,
+    filePath: photoUrl,
   });
+
+  // Update OBS image source with actual file path (not HTTP URL)
+  try {
+    await this.obsService.updateImageSource(`photo-${shotNumber}`, filePath);
+    this.logger.log(`[OBS] Updated photo-${shotNumber}: ${filePath}`);
+  } catch (err) {
+    this.logger.warn(`[OBS] Failed to update photo`, err);
+  }
 }
 
   // ── Strip compositor ───────────────────────────────────────────────────────
 
-  private async buildStrip(session: BoothSession): Promise<string> {
-    const STRIP_W  = 1200;
-    const PHOTO_H  = 400;
-    const PADDING  = 20;
-    const FOOTER_H = 72;
-    const totalH   = PHOTO_H * 3 + PADDING * 4 + FOOTER_H;
+private async buildStrip(
+  session: BoothSession,
+  capturesDir: string,
+  stripsDir: string,
+): Promise<string> {
+  const stripPath = path.join(stripsDir, `${session.id}-strip.jpg`);
+  const logoPath = path.join(process.cwd(), '..', '..', 'public', 'logo.jpg');
 
-    const base = sharp({
-      create: {
-        width: STRIP_W,
-        height: totalH,
-        channels: 3,
-        background: { r: 255, g: 255, b: 255 },
-      },
-    });
+  // Build the strip (3 photos vertically)
+  let composite = sharp(session.capturedPaths[0])
+    .resize(800, 600, { fit: 'cover' })
+    .toBuffer();
 
-    const overlays = await Promise.all(
-      session.capturedPaths.map(async (p, i) => {
-        const buf = await sharp(p)
-          .resize(STRIP_W - PADDING * 2, PHOTO_H, { fit: 'cover', position: 'centre' })
-          .jpeg({ quality: 90 })
-          .toBuffer();
-        return {
-          input: buf,
-          left: PADDING,
-          top: PADDING + i * (PHOTO_H + PADDING),
-        };
-      }),
-    );
-
-    const dateStr = new Date().toLocaleDateString('en-US', {
-      month: 'long', day: 'numeric', year: 'numeric',
-    });
-    const footer = Buffer.from(`
-      <svg width="${STRIP_W}" height="${FOOTER_H}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="${STRIP_W}" height="${FOOTER_H}" fill="white"/>
-        <text x="${STRIP_W / 2}" y="${FOOTER_H / 2 + 10}"
-          text-anchor="middle"
-          font-family="Helvetica Neue, Arial, sans-serif"
-          font-size="26" font-weight="500" fill="#111">
-          ${this.escapeXml(session.name)} · ${dateStr}
-        </text>
-      </svg>`);
-
-    overlays.push({ input: footer, left: 0, top: totalH - FOOTER_H });
-
-    const stripsDir = this.config.get<string>('app.stripsDir')!;
-    await fs.mkdir(stripsDir, { recursive: true });
-    const stripPath = path.join(stripsDir, `strip-${session.id}.jpg`);
-
-    await base.composite(overlays).jpeg({ quality: 93 }).toFile(stripPath);
-    return stripPath;
+  for (let i = 1; i < 3; i++) {
+    const photo = sharp(session.capturedPaths[i])
+      .resize(800, 600, { fit: 'cover' })
+      .toBuffer();
+    
+    composite = sharp(await composite)
+      .extend({
+        bottom: 600,
+        background: { r: 0, g: 0, b: 0, alpha: 1 }
+      })
+      .composite([{
+        input: await photo,
+        top: i * 600,
+        left: 0
+      }])
+      .toBuffer();
   }
+
+  // Add logo to bottom right
+  const finalStrip = sharp(await composite)
+    .extend({
+      bottom: 100,  // Add space at bottom for logo
+      background: { r: 0, g: 0, b: 0, alpha: 1 }
+    })
+    .composite([{
+      input: logoPath,
+      top: 1800 + 20,  // 3 photos (1800px) + 20px padding
+      left: 800 - 180 - 20,  // Bottom right corner (180px logo width - 20px padding)
+    }])
+    .jpeg({ quality: 90 })
+    .toFile(stripPath);
+
+  return stripPath;
+}
 
   // ── Event helpers ──────────────────────────────────────────────────────────
 
-  private setState(session: BoothSession, state: SessionState, extra?: Record<string, unknown>) {
+  private setState(session: BoothSession, state: SessionState, payload?: Record<string, unknown>) {
     session.state = state;
-    this.emit('stateChange', { sessionId: session.id, state, ...extra });
+    this.logger.log(`[StateChange] ${state} for session ${session.id}`);
+    this.emit('stateChange', {
+      sessionId: session.id,
+      state,
+      ...payload,
+    });
   }
 
   private emit(event: string, payload: Record<string, unknown>) {
-    this.events.emit(`booth.${event}`, payload);
+    this.events.emit(event, payload);
     this.logger.debug(`[${event}] ${JSON.stringify(payload)}`);
-  }
-
-  private handleCameraEvent(session: BoothSession, evt: { event: string; filePath?: string }) {
-    if (evt.event === 'cameraDisconnected') {
-      this.logger.warn('Camera disconnected mid-session');
-      this.setState(session, 'error', { error: 'Camera disconnected' });
-    }
   }
 
   private escapeXml(s: string) {

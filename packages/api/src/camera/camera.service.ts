@@ -57,30 +57,37 @@ class PARSECSession implements CameraSession {
    * for a newly created image file. Once found, copy it into our own
    * downloadDir with a predictable name.
    */
-  async takePicture(dir?: string): Promise<string> {
+async takePicture(dir?: string): Promise<string> {
   if (dir) this.downloadDir = dir;
   await fs.mkdir(this.downloadDir, { recursive: true });
 
   const parsecImagesDir = path.join(
-  process.cwd(),
-  '..',
-  '..',
-  '..',
-  'nodejs-canon-control-server',
-  'public',
-  'images',
-);
+    process.cwd(),
+    '..',
+    '..',
+    'parsec-server',
+    'public',
+    'images',
+  );
 
   const url = `${this.parsecBaseUrl}/camera/${this.cameraIndex}/trigger`;
-  const response = await fetch(url, { method: 'POST' });
 
-  if (!response.ok) {
-    let message = response.statusText;
-    try {
-      const error = await response.json();
-      message = error.message ?? message;
-    } catch {}
-    throw new Error(`PARSEC trigger failed: ${message}`);
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      let message = response.statusText;
+      try {
+        const error = await response.json();
+        message = error.message ?? message;
+      } catch {}
+      throw new Error(`PARSEC trigger failed: ${message}`);
+    }
+  } catch (err) {
+    throw new Error(`PARSEC trigger failed: ${err}`);
   }
 
   // PARSEC overwrites the same filename, so we track modification times
@@ -131,6 +138,7 @@ class PARSECSession implements CameraSession {
 
   throw new Error('PARSEC: Photo download timeout (15s)');
 }
+  
   async closeSession(): Promise<void> {
     this.logger.log('[PARSEC] Session closed');
   }
