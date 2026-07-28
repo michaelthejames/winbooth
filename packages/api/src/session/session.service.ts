@@ -47,6 +47,22 @@ export class SessionService {
   private activeSession: BoothSession | null = null;
   private busy = false;
 
+private async triggerHA(shotNumber: number) {
+  try {
+    await fetch('http://192.168.4.227:8123/api/webhook/photobooth-scare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        shot: shotNumber,
+        timestamp: new Date().toISOString()
+      })
+    });
+    this.logger.log(`[HA] Triggered shot ${shotNumber}`);
+  } catch (e) {
+    this.logger.warn(`[HA] Webhook failed`);
+  }
+}
+
   constructor(
     private readonly cameraService: CameraService,
     private readonly deliveryService: DeliveryService,
@@ -102,6 +118,7 @@ export class SessionService {
         this.config.get<string>('app.capturesDir')!,
         session.id,
       );
+      
       const stripsDir = path.join(
         this.config.get<string>('app.stripsDir')!,
         session.id,
@@ -119,7 +136,7 @@ export class SessionService {
         camera.index,
         capturesDir,
       );
-
+      await new Promise(resolve => setTimeout(resolve, 5000));
       // 2. Switch OBS to Countdown scene
       try {
         await this.obsService.setScene('Countdown');
@@ -133,6 +150,7 @@ export class SessionService {
       await this.obsService.updateImageSource('photo-3', '');
       // 3. Shoot 3 photos with countdowns between each
       for (let shot = 1; shot <= 3; shot++) {
+        await this.triggerHA(shot);
         await this.runCountdown(session, shot);
         await this.takeShot(session, nativeSession, capturesDir, shot);
 }
@@ -202,7 +220,7 @@ export class SessionService {
       this.logger.warn('[OBS] Failed to switch to Countdown', err);
     }
   }  
-    
+    await this.triggerHA(shotNumber);
     for (let count = 3; count >= 1; count--) {
       this.logger.log(`[Countdown] ${count} for session ${session.id}`);
       
@@ -225,12 +243,12 @@ export class SessionService {
 
     this.emit('countdown', {
       sessionId: session.id,
-      count: 'SMILE!',
+      count: 'BOO!',
       shotNumber,
       total: 3,
     });
 
-    await sleep(500); // Show SMILE! for half a second
+    await sleep(500); // Show BOO! for half a second
   }
 
   // ── Capture ────────────────────────────────────────────────────────────────
@@ -250,7 +268,6 @@ export class SessionService {
 
     const filePath = await nativeSession.takePicture(capturesDir);
   session.capturedPaths.push(filePath);
-
   const photoUrl = `/camera/captures/${session.id}/${path.basename(filePath)}`;
 
 this.emit('preview', {
