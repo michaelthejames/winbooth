@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Resend } from 'resend';
 import * as fs from 'fs/promises';
 
 export interface DeliveryOptions {
   name: string;
   email: string;
+  processedPhotoPaths: string[];
   stripPath: string;
   sessionId: string;
 }
@@ -14,65 +16,47 @@ export class DeliveryService {
   private readonly logger = new Logger(DeliveryService.name);
   private resendApiKey: string;
   private fromEmail: string;
+  private resend: Resend;
 
   constructor(private readonly config: ConfigService) {
     this.resendApiKey = this.config.get<string>('RESEND_API_KEY') || '';
     this.fromEmail = this.config.get<string>('FROM_EMAIL') || 'noreply@example.com';
+    this.resend = new Resend(this.resendApiKey);
   }
 
-  async deliver(opts: DeliveryOptions): Promise<void> {
-    await this.sendEmail(opts);
-  }
+  async deliver(options: DeliveryOptions): Promise<void> {
+  try {
+    const attachments = [];
 
-  private async sendEmail(opts: DeliveryOptions): Promise<void> {
-    if (!opts.email) {
-      throw new Error('Email address required');
-    }
-
-    if (!this.resendApiKey) {
-      this.logger.warn('RESEND_API_KEY not configured — skipping email');
-      return;
-    }
-
-    try {
-      const imageBuffer = await fs.readFile(opts.stripPath);
-      const base64Image = imageBuffer.toString('base64');
-
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.resendApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: this.fromEmail,
-          to: opts.email,
-          subject: `Your Photo Booth Strip - ${opts.name}`,
-          html: `
-            <h1>Your Photo Booth Strip</h1>
-            <p>Hi ${opts.name},</p>
-            <p>Here's your photo booth strip from today!</p>
-            <img src="cid:strip" alt="Photo Strip" style="max-width: 100%; border-radius: 8px;" />
-            <p>Thanks for visiting!</p>
-          `,
-          attachments: [
-            {
-              filename: `photo-strip-${opts.sessionId}.jpg`,
-              content: base64Image,
-            },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Resend API error: ${error.message}`);
+    // Add individual processed photos (with border + logo)
+    if (options.processedPhotoPaths) {
+      for (let i = 0; i < options.processedPhotoPaths.length; i++) {
+        const photoPath = options.processedPhotoPaths[i];
+        attachments.push({
+          filename: `photo-${i + 1}.jpg`,
+          path: photoPath,
+        });
       }
-
-      this.logger.log(`Email sent to ${opts.email}`);
-    } catch (err) {
-      this.logger.error(`Failed to send email: ${err}`);
-      throw err;
     }
+
+    // Add composited strip (with border + logo)
+  attachments.push({
+    filename: 'photo-strip.jpg',
+    path: options.stripPath,
+    });
+
+  await this.resend.emails.send({
+    from: process.env.FROM_EMAIL,
+    to: options.email,
+    subject: 'Your Photo Booth Photos!',
+    html: `<h2>Hi ${options.name}!</h2><p>Here are your photos from the booth. Enjoy!</p>`,
+    attachments,
+    });
+
+    this.logger.log(`Email sent to ${options.email}`);
+  } catch (e) {
+    this.logger.error(`Delivery failed: ${e}`);
+    throw e;
+  }
   }
 }

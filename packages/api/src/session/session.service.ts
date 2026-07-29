@@ -181,11 +181,12 @@ private async triggerHA(shotNumber: number) {
       // 7. Deliver
       this.setState(session, 'delivering');
       await this.deliveryService.deliver({
-        name: session.name,
-        email: session.email,
-        stripPath,
-        sessionId: session.id,
-      });
+      name: session.name,
+      email: session.email,
+      stripPath: stripPath,
+      processedPhotoPaths: (session as any).processedPhotoPaths || [],  // Pass it here
+      sessionId: session.id,
+});
 
       // 8. Switch back to Preview
     //try {
@@ -292,17 +293,29 @@ private async buildStrip(
   capturesDir: string,
   stripsDir: string,
 ): Promise<string> {
+  const logoPath = 'C:\\Users\\brand\\winbooth\\assets\\sign.png';
   const stripPath = path.join(stripsDir, `${session.id}-strip.jpg`);
 
-  // All photos are 800x600, stacked vertically = 800x1800
   const photoWidth = 800;
   const photoHeight = 600;
   const totalHeight = photoHeight * 3;
 
-  // Create a black canvas
+  // STEP 1: Process individual photos - add border + logo
+  const processedPhotoPaths: string[] = [];
+  for (let i = 0; i < session.capturedPaths.length; i++) {
+    const originalPath = session.capturedPaths[i];
+    const processedPath = originalPath.replace('.jpg', '-processed.jpg');
+    
+    await this.addBorderAndLogo(originalPath, processedPath, logoPath, 20, 50);
+    processedPhotoPaths.push(processedPath);
+  }
+  
+  // Store processed paths in session for email delivery
+  (session as any).processedPhotoPaths = processedPhotoPaths;
+
+  // STEP 2: Composite ORIGINAL photos into strip (no logo yet)
   const canvas = Buffer.alloc(photoWidth * totalHeight * 3);
 
-  // Load all photos as resized buffers
   const photos = await Promise.all(
     session.capturedPaths.map((filePath) =>
       sharp(filePath)
@@ -312,7 +325,6 @@ private async buildStrip(
     ),
   );
 
-  // Composite all photos into canvas
   const composites = photos.map((photoBuffer, index) => ({
     input: photoBuffer,
     raw: { width: photoWidth, height: photoHeight, channels: 3 },
@@ -320,16 +332,78 @@ private async buildStrip(
     left: 0,
   }));
 
-  // Build the strip
+  const stripWithoutBorder = path.join(stripsDir, `${session.id}-strip-temp.jpg`);
+  
   await sharp(canvas, {
     raw: { width: photoWidth, height: totalHeight, channels: 3 },
   })
     .composite(composites)
     .jpeg({ quality: 90 })
-    .toFile(stripPath);
+    .toFile(stripWithoutBorder);
 
-  this.logger.log(`[Strip] Composited to ${stripPath}`);
+  this.logger.log(`[Strip] Composited to ${stripWithoutBorder}`);
+
+  // STEP 3: Add border + logo to the completed strip
+  await this.addBorderAndLogo(stripWithoutBorder, stripPath, logoPath, 20, 50);
+  
+  // Clean up temp file
+try {
+  await fs.unlink(stripWithoutBorder);
+} catch (e) {
+  this.logger.warn(`Could not delete temp file: ${stripWithoutBorder}`);
+}
+
   return stripPath;
+}
+
+private async addBorderAndLogo(
+  imagePath: string,
+  outputPath: string,
+  logoPath: string,
+  borderWidth: number = 20,
+  logoHeight: number = 50,
+): Promise<void> {
+  try {
+    const image = sharp(imagePath);
+    const metadata = await image.metadata();
+
+    // Add white border
+    const withBorder = await image
+      .extend({
+        top: borderWidth,
+        bottom: borderWidth,
+        left: borderWidth,
+        right: borderWidth,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      })
+      .toBuffer();
+
+    // Resize logo
+    const logoBuffer = await sharp(logoPath)
+      .resize(undefined, logoHeight, { withoutEnlargement: true })
+      .toBuffer();
+
+    const logoMetadata = await sharp(logoBuffer).metadata();
+    const newWidth = (metadata.width || 0) + borderWidth * 2;
+    const newHeight = (metadata.height || 0) + borderWidth * 2;
+    const padding = 15;
+
+    // Add logo to bottom right
+    await sharp(withBorder)
+      .composite([
+        {
+          input: logoBuffer,
+          left: newWidth - (logoMetadata.width || 0) - padding,
+          top: newHeight - (logoMetadata.height || 0) - padding,
+        },
+      ])
+      .toFile(outputPath);
+
+    this.logger.log(`[Processing] Added border and logo: ${outputPath}`);
+  } catch (e) {
+    this.logger.error(`[Processing] Error: ${e}`);
+    throw e;
+  }
 }
   // ── Event helpers ──────────────────────────────────────────────────────────
 
