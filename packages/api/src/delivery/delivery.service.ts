@@ -32,17 +32,19 @@ export class DeliveryService {
     if (options.processedPhotoPaths) {
       for (let i = 0; i < options.processedPhotoPaths.length; i++) {
         const photoPath = options.processedPhotoPaths[i];
+        const buffer = await fs.readFile(photoPath);
         attachments.push({
           filename: `photo-${i + 1}.jpg`,
-          path: photoPath,
+         content: buffer.toString('base64'),
         });
       }
     }
 
     // Add composited strip (with border + logo)
+  const stripBuffer = await fs.readFile(options.stripPath);
   attachments.push({
     filename: 'photo-strip.jpg',
-    path: options.stripPath,
+    content: stripBuffer.toString('base64'),
     });
 
   await this.resend.emails.send({

@@ -24,6 +24,11 @@ async function bootstrap() {
   app.use(express.static(publicPath));
   console.log(`📁 Serving from: ${publicPath}`);
 
+  // Serve captures directory
+  const capturesPath = 'C:\\photobooth\\captures';
+  app.use('/camera/captures', express.static(capturesPath));
+  console.log(`📁 Serving captures from: ${capturesPath}`);
+
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   console.log(`\n🎞  Photo booth API running on http://localhost:${port}`);

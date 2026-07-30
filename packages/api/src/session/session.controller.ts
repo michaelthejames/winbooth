@@ -32,6 +32,7 @@ export class SessionController {
     const session = await this.sessionService.start(dto);
     return { ok: true, sessionId: session.id };
   }
+  
   @Get('debug/obs-scenes')
   async debugObsScenes() {
   try {
@@ -67,7 +68,8 @@ async testObsScene(@Param('sceneName') sceneName: string) {
     return { success: false, error: String(err) };
   }
 }
-  /** GET /session/status — poll from the display or admin panel */
+  
+/** GET /session/status — poll from the display or admin panel */
   @Get('status')
   status() {
     const session = this.sessionService.getActiveSession();

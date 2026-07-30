@@ -13,460 +13,758 @@
 
     body {
       font-family: 'Courier New', monospace;
-      background: #1a1a1a;
-      color: #00ff00;
+      background: #0a0e27;
+      color: #fff;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto auto 1fr;
+      gap: 15px;
       padding: 20px;
-      overflow-y: auto;
+      height: 100vh;
+      overflow: hidden;
     }
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
+    /* Header */
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(135deg, #8b008b 0%, #ff4444 100%);
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 20px rgba(139, 0, 139, 0.5);
     }
 
     h1 {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #00ff00;
-      text-shadow: 0 0 10px #00ff00;
       font-size: 28px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-
-    @media (max-width: 900px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .panel {
-      background: #222;
-      border: 2px solid #00ff00;
-      border-radius: 4px;
-      padding: 20px;
-      box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
-    }
-
-    .panel h2 {
-      color: #00ff00;
-      font-size: 14px;
-      margin-bottom: 15px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    }
-
-    .status-display {
-      font-size: 32px;
-      text-align: center;
-      padding: 20px;
-      margin: 10px 0;
-      background: #111;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    }
-
-    .status-idle {
-      color: #888;
-    }
-
-    .status-countdown {
-      color: #ffff00;
       text-shadow: 0 0 10px #ffff00;
     }
 
-    .status-shooting {
-      color: #ff4444;
-      text-shadow: 0 0 10px #ff4444;
-      animation: pulse 0.5s infinite;
+    .connection-status {
+      display: flex;
+      gap: 10px;
+      font-size: 12px;
     }
 
-    .status-processing {
-      color: #4488ff;
-      text-shadow: 0 0 10px #4488ff;
+    .connection-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff4444;
+      animation: pulse 1s infinite;
     }
 
-    .status-delivering {
-      color: #44ff44;
-      text-shadow: 0 0 10px #44ff44;
-    }
-
-    .status-done {
-      color: #00ff00;
-      text-shadow: 0 0 10px #00ff00;
-    }
-
-    .status-error {
-      color: #ff0000;
-      text-shadow: 0 0 10px #ff0000;
-      animation: pulse 0.3s infinite;
+    .connection-indicator.connected {
+      background: #00ff00;
+      animation: none;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
+      50% { opacity: 0.5; }
     }
 
-    .info-row {
+    /* Health Status Panel */
+    .health-panel {
+      grid-column: 1;
+      grid-row: 2;
+      background: rgba(20, 10, 40, 0.9);
+      border: 2px solid #8b008b;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 0 15px rgba(139, 0, 139, 0.3);
+    }
+
+    .health-panel h2 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #ff8888;
+      text-shadow: 0 0 5px #ff4444;
+    }
+
+    .health-item {
       display: flex;
       justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid #333;
+      align-items: center;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .health-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff4444;
+      box-shadow: 0 0 8px #ff4444;
+    }
+
+    .status-dot.ok {
+      background: #00ff00;
+      box-shadow: 0 0 8px #00ff00;
+    }
+
+    /* Current Session Panel */
+    .session-panel {
+      grid-column: 2;
+      grid-row: 2 / 4;
+      background: rgba(20, 10, 40, 0.9);
+      border: 2px solid #8b008b;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 0 15px rgba(139, 0, 139, 0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .session-panel h2 {
       font-size: 14px;
+      color: #ff8888;
+      margin-bottom: 20px;
+      text-shadow: 0 0 5px #ff4444;
     }
 
-    .info-row:last-child {
-      border-bottom: none;
+    .session-info {
+      font-size: 14px;
+      line-height: 1.8;
+      margin-bottom: 30px;
     }
 
-    .label {
-      color: #888;
+    .session-info .label {
+      color: #bb88bb;
       font-weight: bold;
     }
 
-    .value {
-      color: #00ff00;
-      text-align: right;
+    .session-info .value {
+      color: #88ff88;
+    }
+
+    .session-status {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-shadow: 0 0 10px #ff4444;
     }
 
     .photo-counter {
-      font-size: 48px;
-      text-align: center;
-      color: #00ff00;
-      padding: 20px;
-      text-shadow: 0 0 10px #00ff00;
-    }
-
-    .log {
-      background: #111;
-      border: 1px solid #333;
-      border-radius: 4px;
-      padding: 15px;
-      height: 300px;
-      overflow-y: auto;
-      font-size: 12px;
-      line-height: 1.5;
-    }
-
-    .log-entry {
-      padding: 4px 0;
-      border-bottom: 1px solid #222;
-      color: #00ff00;
-    }
-
-    .log-entry:last-child {
-      border-bottom: none;
-    }
-
-    .log-time {
-      color: #666;
-      margin-right: 10px;
-    }
-
-    .log-event {
-      color: #00ff00;
-    }
-
-    .log-error {
-      color: #ff4444;
-    }
-
-    .log-warning {
-      color: #ffff00;
-    }
-
-    .connection-status {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 4px;
-      font-size: 12px;
+      font-size: 28px;
       font-weight: bold;
-      margin-top: 10px;
+      margin: 20px 0;
+      color: #ffff00;
+      text-shadow: 0 0 10px #ffff00;
     }
 
-    .connected {
-      background: #00ff00;
-      color: #000;
+    .idle-message {
+      color: #bb88bb;
+      font-size: 18px;
+      margin-top: 40px;
     }
 
-    .disconnected {
-      background: #ff0000;
-      color: #fff;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 15px;
-    }
-
-    .stat-box {
-      background: #111;
-      border: 1px solid #333;
+    /* Stats Panel */
+    .stats-panel {
+      grid-column: 3;
+      grid-row: 2;
+      background: rgba(20, 10, 40, 0.9);
+      border: 2px solid #8b008b;
+      border-radius: 8px;
       padding: 15px;
-      text-align: center;
+      box-shadow: 0 0 15px rgba(139, 0, 139, 0.3);
+    }
+
+    .stats-panel h2 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #ff8888;
+      text-shadow: 0 0 5px #ff4444;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: rgba(0, 0, 0, 0.3);
       border-radius: 4px;
+      font-size: 13px;
     }
 
     .stat-label {
-      color: #888;
-      font-size: 11px;
-      text-transform: uppercase;
-      margin-bottom: 5px;
+      color: #bb88bb;
     }
 
     .stat-value {
-      color: #00ff00;
-      font-size: 24px;
+      color: #ffff00;
       font-weight: bold;
+    }
+
+    /* Error Log Panel */
+    .error-panel {
+      grid-column: 1 / 3;
+      grid-row: 3;
+      background: rgba(20, 10, 40, 0.9);
+      border: 2px solid #8b008b;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 0 15px rgba(139, 0, 139, 0.3);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .error-panel h2 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      color: #ff8888;
+      text-shadow: 0 0 5px #ff4444;
+    }
+
+    .error-log {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 4px;
+      border-left: 3px solid #ff4444;
+    }
+
+    .error-entry {
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255, 68, 68, 0.2);
+      line-height: 1.4;
+    }
+
+    .error-entry:last-child {
+      border-bottom: none;
+    }
+
+    .error-time {
+      color: #bb88bb;
+    }
+
+    .error-type {
+      color: #ffff00;
+      font-weight: bold;
+    }
+
+    .error-type.camera {
+      color: #ff6666;
+    }
+
+    .error-type.obs {
+      color: #ff8800;
+    }
+
+    .error-type.delivery {
+      color: #ff4444;
+    }
+
+    .error-msg {
+      color: #ff8888;
+    }
+
+    .error-empty {
+      text-align: center;
+      color: #666;
+      padding: 20px 0;
+    }
+
+    /* History/Resend Panel */
+    .history-panel {
+      grid-column: 3;
+      grid-row: 3;
+      background: rgba(20, 10, 40, 0.9);
+      border: 2px solid #8b008b;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 0 15px rgba(139, 0, 139, 0.3);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .history-panel h2 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      color: #ff8888;
+      text-shadow: 0 0 5px #ff4444;
+    }
+
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 11px;
+    }
+
+    .history-item {
+      padding: 8px;
+      margin-bottom: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      border-left: 3px solid #00ff00;
+    }
+
+    .history-item.error {
+      border-left-color: #ff4444;
+      background: rgba(255, 68, 68, 0.1);
+    }
+
+    .history-name {
+      color: #ffff00;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+
+    .history-email {
+      color: #88ff88;
+      font-size: 10px;
+      margin-bottom: 5px;
+      word-break: break-all;
+    }
+
+    .history-time {
+      color: #bb88bb;
+      font-size: 10px;
+      margin-bottom: 5px;
+    }
+
+    .history-status {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 9px;
+      margin-right: 5px;
+    }
+
+    .history-status.success {
+      background: rgba(0, 255, 0, 0.2);
+      color: #00ff00;
+    }
+
+    .history-status.error {
+      background: rgba(255, 68, 68, 0.2);
+      color: #ff4444;
+    }
+
+    .resend-btn {
+      padding: 3px 8px;
+      background: #8b008b;
+      color: #fff;
+      border: 1px solid #ff4444;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 9px;
+      margin-top: 5px;
+      transition: all 0.2s;
+    }
+
+    .resend-btn:hover {
+      background: #ff4444;
+      box-shadow: 0 0 8px #ff4444;
+    }
+
+    .resend-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Alert Flash */
+    .error-alert {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ff4444;
+      color: #000;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 20px #ff4444;
+      font-weight: bold;
+      animation: slideIn 0.3s ease-out, slideOut 5s ease-in 4.7s;
+      z-index: 1000;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(400px); opacity: 0; }
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #8b008b;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #ff4444;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>📸 PHOTO BOOTH OPERATOR DASHBOARD</h1>
+  <!-- Header -->
+  <header>
+    <h1>📸 BOOTH OPERATOR DASHBOARD</h1>
+    <div class="connection-status">
+      <span>Socket.IO:</span>
+      <span class="connection-indicator" id="connection-indicator"></span>
+    </div>
+  </header>
 
-    <div class="grid">
-      <!-- Status Panel -->
-      <div class="panel">
-        <h2>Session Status</h2>
-        <div class="status-display" id="status">IDLE</div>
-        <div id="sessionInfo">
-          <div class="info-row">
-            <span class="label">Guest:</span>
-            <span class="value">-</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Delivery:</span>
-            <span class="value">-</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Contact:</span>
-            <span class="value">-</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Session ID:</span>
-            <span class="value" style="font-size: 11px; word-break: break-all;">-</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Photo Counter -->
-      <div class="panel">
-        <h2>Photos Captured</h2>
-        <div class="photo-counter" id="photoCount">0 / 3</div>
-        <div class="stats">
-          <div class="stat-box">
-            <div class="stat-label">Total Sessions</div>
-            <div class="stat-value" id="totalSessions">0</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Uptime</div>
-            <div class="stat-value" id="uptime">0m</div>
-          </div>
-        </div>
+  <!-- Health Panel -->
+  <div class="health-panel">
+    <h2>🏥 BOOTH HEALTH</h2>
+    <div class="health-item">
+      <span>Camera</span>
+      <div class="health-status">
+        <div class="status-dot" id="health-camera"></div>
+        <span id="health-camera-msg">Checking...</span>
       </div>
     </div>
-
-    <!-- Event Log -->
-    <div class="panel">
-      <h2>Event Log</h2>
-      <div class="log" id="eventLog"></div>
-      <div id="connectionStatus" class="connection-status disconnected">
-        ⚫ DISCONNECTED
+    <div class="health-item">
+      <span>OBS</span>
+      <div class="health-status">
+        <div class="status-dot" id="health-obs"></div>
+        <span id="health-obs-msg">Checking...</span>
       </div>
+    </div>
+    <div class="health-item">
+      <span>Email API</span>
+      <div class="health-status">
+        <div class="status-dot" id="health-email"></div>
+        <span id="health-email-msg">Checking...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Panel -->
+  <div class="session-panel">
+    <h2>👤 CURRENT SESSION</h2>
+    <div id="session-display">
+      <div class="idle-message">🛑 WAITING FOR GUEST...</div>
+    </div>
+  </div>
+
+  <!-- Stats Panel -->
+  <div class="stats-panel">
+    <h2>📊 TODAY'S STATS</h2>
+    <div class="stat-item">
+      <span class="stat-label">Sessions</span>
+      <span class="stat-value" id="stat-sessions">0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Emails Sent</span>
+      <span class="stat-value" id="stat-emails">0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Errors</span>
+      <span class="stat-value" id="stat-errors">0</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-label">Uptime</span>
+      <span class="stat-value" id="stat-uptime">0h</span>
+    </div>
+  </div>
+
+  <!-- Error Log Panel -->
+  <div class="error-panel">
+    <h2>⚠️ ERROR LOG (Last 20)</h2>
+    <div class="error-log" id="error-log">
+      <div class="error-empty">No errors yet...</div>
+    </div>
+  </div>
+
+  <!-- Session History Panel -->
+  <div class="history-panel">
+    <h2>📋 SESSION HISTORY</h2>
+    <div class="history-list" id="history-list">
+      <div class="error-empty">No sessions yet...</div>
     </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-const socket = io();
-let currentSession = null;
-let photosCaptured = 0;
-let totalSessions = 0;
-let startTime = Date.now();
+    const socket = io();
+    const startTime = Date.now();
 
-const elements = {
-  status: document.getElementById('status'),
-  sessionInfo: document.getElementById('sessionInfo'),
-  photoCount: document.getElementById('photoCount'),
-  eventLog: document.getElementById('eventLog'),
-  connectionStatus: document.getElementById('connectionStatus'),
-  totalSessions: document.getElementById('totalSessions'),
-  uptime: document.getElementById('uptime'),
-};
+    // Connection status
+    socket.on('connect', () => {
+      document.getElementById('connection-indicator').classList.add('connected');
+      console.log('Connected to server');
+    });
 
-function log(event, data = '') {
-  const now = new Date();
-  const time = now.toLocaleTimeString();
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  
-  let html = `<span class="log-time">[${time}]</span>`;
-  
-  if (event.includes('error') || event.includes('Error')) {
-    html += `<span class="log-error">${event}</span>`;
-  } else if (event.includes('warn') || event.includes('Warning')) {
-    html += `<span class="log-warning">${event}</span>`;
-  } else {
-    html += `<span class="log-event">${event}</span>`;
-  }
-  
-  if (data) {
-    html += ` ${data}`;
-  }
-  
-  entry.innerHTML = html;
-  elements.eventLog.appendChild(entry);
-  elements.eventLog.scrollTop = elements.eventLog.scrollHeight;
-  
-  // Keep only last 100 entries
-  const entries = elements.eventLog.querySelectorAll('.log-entry');
-  if (entries.length > 100) {
-    entries[0].remove();
-  }
-}
+    socket.on('disconnect', () => {
+      document.getElementById('connection-indicator').classList.remove('connected');
+      console.log('Disconnected from server');
+    });
 
-function setStatus(state, data = {}) {
-  elements.status.textContent = state.toUpperCase();
-  elements.status.className = `status-display status-${state}`;
-  log(`Status changed: ${state}`);
+    // Session updates
+    socket.on('session-started', (data) => {
+      updateSessionDisplay(data);
+    });
 
-  if (state === 'idle') {
-    photosCaptured = 0;
-    currentSession = null;
-    updateSessionInfo();
-  }
-}
+    socket.on('countdown', (data) => {
+      updateSessionDisplay({ status: 'countdown', count: data.count });
+    });
 
-function updateSessionInfo() {
-  let html = '';
-  
-  if (currentSession) {
-    html = `
-      <div class="info-row">
-        <span class="label">Guest:</span>
-        <span class="value">${currentSession.name}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Delivery:</span>
-        <span class="value">${currentSession.delivery.toUpperCase()}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Contact:</span>
-        <span class="value">${currentSession.email || currentSession.phone || '-'}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Session ID:</span>
-        <span class="value" style="font-size: 11px; word-break: break-all;">${currentSession.id}</span>
-      </div>
-    `;
-  } else {
-    html = `
-      <div class="info-row">
-        <span class="label">Guest:</span>
-        <span class="value">-</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Delivery:</span>
-        <span class="value">-</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Contact:</span>
-        <span class="value">-</span>
-      </div>
-      <div class="info-row">
-        <span class="label">Session ID:</span>
-        <span class="value">-</span>
-      </div>
-    `;
-  }
-  
-  elements.sessionInfo.innerHTML = html;
-}
+    socket.on('photo-taken', (data) => {
+      updateSessionDisplay({ status: 'shooting', photoNumber: data.shot, totalPhotos: 3 });
+    });
 
-function updatePhotoCount() {
-  elements.photoCount.textContent = `${photosCaptured} / 3`;
-}
+    socket.on('session-done', (data) => {
+      updateSessionDisplay({ status: 'done' });
+      setTimeout(() => {
+        clearSessionDisplay();
+      }, 5000);
+      loadHistory();
+      updateStats();
+    });
 
-function updateUptime() {
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  const minutes = Math.floor(elapsed / 60);
-  const hours = Math.floor(minutes / 60);
-  
-  if (hours > 0) {
-    elements.uptime.textContent = `${hours}h ${minutes % 60}m`;
-  } else {
-    elements.uptime.textContent = `${minutes}m`;
-  }
-}
+    socket.on('session-error', (data) => {
+      updateSessionDisplay({ status: 'error', error: data.message });
+    });
 
-// Socket.IO Events
-socket.on('connect', () => {
-  log('✓ Connected to server');
-  elements.connectionStatus.textContent = '🟢 CONNECTED';
-  elements.connectionStatus.className = 'connection-status connected';
-});
+    // Health updates
+    socket.on('health-status', (health) => {
+      updateHealth(health);
+    });
 
-socket.on('disconnect', () => {
-  log('✗ Disconnected from server');
-  elements.connectionStatus.textContent = '🔴 DISCONNECTED';
-  elements.connectionStatus.className = 'connection-status disconnected';
-});
+    // Error alerts
+    socket.on('error-alert', (error) => {
+      showErrorAlert(error);
+      loadErrorLog();
+      updateStats();
+    });
 
-socket.on('stateChange', (data) => {
-  log('State change:', data.state);
-  setStatus(data.state);
+    // Load initial data
+    async function loadInitialData() {
+      try {
+        const [health, errors, history] = await Promise.all([
+          fetch('/session/health').then(r => r.json()),
+          fetch('/session/errors/recent?count=20').then(r => r.json()),
+          fetch('/session/history').then(r => r.json()),
+        ]);
 
-  if (data.state === 'countdown') {
-    currentSession = {
-      id: data.sessionId,
-      name: data.guestName || 'Guest',
-      delivery: data.delivery || 'unknown',
-      email: data.email,
-      phone: data.phone,
-    };
-    photosCaptured = 0;
-    updateSessionInfo();
-    updatePhotoCount();
-    totalSessions++;
-    elements.totalSessions.textContent = totalSessions;
-  }
+        updateHealth(health);
+        displayErrors(errors);
+        displayHistory(history.slice(-10).reverse());
+        updateStats();
+      } catch (err) {
+        console.error('Failed to load initial data:', err);
+      }
+    }
 
-  if (data.error) {
-    log('ERROR:', data.error);
-  }
-});
+    function updateHealth(health) {
+      updateHealthItem('camera', health.camera);
+      updateHealthItem('obs', health.obs);
+      updateHealthItem('email', health.email);
+    }
 
-socket.on('countdown', (data) => {
-  log(`Countdown: ${data.count}`);
-});
+    function updateHealthItem(type, status) {
+      const dot = document.getElementById(`health-${type}`);
+      const msg = document.getElementById(`health-${type}-msg`);
+      
+      if (status.status === 'ok') {
+        dot.classList.add('ok');
+        msg.textContent = status.message;
+      } else {
+        dot.classList.remove('ok');
+        msg.textContent = '✗ ' + status.message;
+      }
+    }
 
-socket.on('preview', (data) => {
-  photosCaptured = data.shotNumber;
-  updatePhotoCount();
-  log(`Photo captured: Shot ${data.shotNumber}`);
-});
+    function updateSessionDisplay(data) {
+      const display = document.getElementById('session-display');
+      
+      if (data.status === 'waiting') {
+        display.innerHTML = `
+          <div class="session-info">
+            <div><span class="label">Guest:</span> <span class="value">${data.name || 'N/A'}</span></div>
+            <div><span class="label">Email:</span> <span class="value">${data.email || 'N/A'}</span></div>
+            <div class="session-status" style="margin-top: 20px;">🪑 GETTING READY...</div>
+          </div>
+        `;
+      } else if (data.status === 'countdown') {
+        display.innerHTML = `
+          <div class="session-status">📸 ${data.count}</div>
+          <div style="font-size: 14px; color: #bb88bb;">Get ready!</div>
+        `;
+      } else if (data.status === 'shooting') {
+        display.innerHTML = `
+          <div class="photo-counter">${data.photoNumber} / ${data.totalPhotos}</div>
+          <div style="font-size: 14px; color: #bb88bb;">Taking photos...</div>
+        `;
+      } else if (data.status === 'done') {
+        display.innerHTML = `
+          <div style="font-size: 16px; color: #00ff00; font-weight: bold;">✓ SESSION COMPLETE</div>
+          <div style="font-size: 12px; color: #bb88bb; margin-top: 20px;">Photos sent to email</div>
+        `;
+      } else if (data.status === 'error') {
+        display.innerHTML = `
+          <div style="font-size: 16px; color: #ff4444; font-weight: bold;">✗ ERROR</div>
+          <div style="font-size: 11px; color: #ff8888; margin-top: 20px;">${data.error}</div>
+        `;
+      }
+    }
 
-socket.on('stripReady', (data) => {
-  log('Strip ready and delivered');
-});
+    function clearSessionDisplay() {
+      const display = document.getElementById('session-display');
+      display.innerHTML = '<div class="idle-message">🛑 WAITING FOR GUEST...</div>';
+    }
 
-// Update uptime every minute
-setInterval(updateUptime, 60000);
-updateUptime();
+    function displayErrors(errors) {
+      const log = document.getElementById('error-log');
+      
+      if (errors.length === 0) {
+        log.innerHTML = '<div class="error-empty">No errors yet...</div>';
+        return;
+      }
 
-// Initial state
-setStatus('idle');
-updateSessionInfo();
-updatePhotoCount();
+      log.innerHTML = errors.slice().reverse().map(e => {
+        const time = new Date(e.timestamp).toLocaleTimeString();
+        return `
+          <div class="error-entry">
+            <span class="error-time">[${time}]</span>
+            <span class="error-type ${e.type}">${e.type.toUpperCase()}</span>
+            <span class="error-msg">${e.message}</span>
+            ${e.context ? `<div style="color: #888; font-size: 10px; margin-top: 2px;">→ ${e.context}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadErrorLog() {
+      try {
+        const errors = await fetch('/session/errors/recent?count=20').then(r => r.json());
+        displayErrors(errors);
+      } catch (err) {
+        console.error('Failed to load error log:', err);
+      }
+    }
+
+    function displayHistory(sessions) {
+      const list = document.getElementById('history-list');
+      
+      if (sessions.length === 0) {
+        list.innerHTML = '<div class="error-empty">No sessions yet...</div>';
+        return;
+      }
+
+      list.innerHTML = sessions.map(s => {
+        const time = new Date(s.timestamp).toLocaleTimeString();
+        const isError = s.status === 'error';
+        return `
+          <div class="history-item ${isError ? 'error' : ''}">
+            <div class="history-name">${s.name}</div>
+            <div class="history-email">${s.email}</div>
+            <div class="history-time">${time}</div>
+            <div>
+              <span class="history-status ${s.status}">${s.status.toUpperCase()}</span>
+              <button class="resend-btn" onclick="resendEmail('${s.sessionId}', '${s.email}')">📧 Resend</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadHistory() {
+      try {
+        const sessions = await fetch('/session/history').then(r => r.json());
+        displayHistory(sessions.slice(-10).reverse());
+      } catch (err) {
+        console.error('Failed to load history:', err);
+      }
+    }
+
+    async function resendEmail(sessionId, email) {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '⏳ Sending...';
+
+      try {
+        const response = await fetch(`/session/resend-email/${sessionId}`, { method: 'POST' });
+        if (response.ok) {
+          btn.textContent = '✓ Sent!';
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = '📧 Resend';
+          }, 2000);
+        } else {
+          throw new Error('Resend failed');
+        }
+      } catch (err) {
+        btn.textContent = '✗ Failed';
+        btn.disabled = false;
+        alert(`Failed to resend to ${email}`);
+      }
+    }
+
+    function showErrorAlert(error) {
+      const alert = document.createElement('div');
+      alert.className = 'error-alert';
+      alert.textContent = `⚠️ ${error.type.toUpperCase()}: ${error.message}`;
+      document.body.appendChild(alert);
+
+      setTimeout(() => {
+        alert.remove();
+      }, 5000);
+    }
+
+    async function updateStats() {
+      try {
+        const [sessions, errors] = await Promise.all([
+          fetch('/session/history/today').then(r => r.json()),
+          fetch('/session/errors/today').then(r => r.json()),
+        ]);
+
+        const emailCount = sessions.filter(s => s.status === 'success').length;
+        const uptime = Math.floor((Date.now() - startTime) / 3600000);
+
+        document.getElementById('stat-sessions').textContent = sessions.length;
+        document.getElementById('stat-emails').textContent = emailCount;
+        document.getElementById('stat-errors').textContent = errors.length;
+        document.getElementById('stat-uptime').textContent = uptime + 'h';
+      } catch (err) {
+        console.error('Failed to update stats:', err);
+      }
+    }
+
+    // Initial load
+    loadInitialData();
+
+    // Refresh health every 30 seconds
+    setInterval(() => {
+      fetch('/session/health')
+        .then(r => r.json())
+        .then(h => updateHealth(h))
+        .catch(err => console.error('Health check failed:', err));
+    }, 30000);
+
+    // Refresh stats every 60 seconds
+    setInterval(updateStats, 60000);
   </script>
 </body>
 </html>

@@ -8,7 +8,7 @@ import { v4 as uuid } from 'uuid';
 import { CameraService } from '../camera/camera.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { ObsService } from '../obs/obs.service';
-
+import { access } from 'fs/promises';
 
 // ── Session states ────────────────────────────────────────────────────────────
 export type SessionState =
@@ -154,19 +154,36 @@ private async triggerHA(shotNumber: number) {
         await this.runCountdown(session, shot);
         await this.takeShot(session, nativeSession, capturesDir, shot);
 }
+
       // 4. Composite strip
+      this.logger.log(`[SessionService] About to call buildStrip`);
       this.setState(session, 'processing');
+      this.logger.log(`[SessionService] Calling buildStrip now`);
       const stripPath = await this.buildStrip(session, capturesDir, stripsDir);
+      this.logger.log(`[SessionService] buildStrip returned: ${stripPath}`);
       session.stripPath = stripPath;
 
       // 6. Switch to Delivery scene and show strip
+    // 6. Switch to Delivery scene and show a photo (not the strip)
     try {
       await this.obsService.setScene('Delivery');
-      await this.obsService.updateImageSource('strip-image', stripPath);
-      this.logger.log(`[OBS] Switched to Delivery scene, showing strip`);
-    } catch (err) {
-      this.logger.warn('[OBS] Failed to show delivery scene', err);
-    }
+      
+      const processedPaths = (session as any).processedPhotoPaths || [];
+      this.logger.log(`[DEBUG] Processed paths: ${JSON.stringify(processedPaths)}`);
+      
+      if (processedPaths.length > 0) {
+        // Show photo 2 (middle)
+        const fullPath = processedPaths[1];
+        this.logger.log(`[DEBUG] Full path: ${fullPath}`);
+        
+        await this.obsService.updateImageSource('strip-image', fullPath);
+    this.logger.log(`[OBS] Switched to Delivery scene, showing photo: ${fullPath}`);
+  } else {
+    this.logger.warn('[OBS] No processed photos found');
+  }
+} catch (err) {
+  this.logger.error('[OBS] Failed to show delivery scene', err);
+}
 
       // 6. Show strip for 5 seconds
       await sleep(5000);
@@ -188,20 +205,9 @@ private async triggerHA(shotNumber: number) {
       sessionId: session.id,
 });
 
-      // 8. Switch back to Preview
-    //try {
-    //  await this.obsService.setScene('Preview');
-    //  this.logger.log('[OBS] Switched back to Preview scene');
-    //} catch (err) {
-    //  this.logger.warn('[OBS] Failed to switch to Preview', err);
-    //}
-      // 9. Done
       this.setState(session, 'done');
 
       // Cleanup captures after a delay (keep the strip)
-      setTimeout(async () => {
-        await fs.rm(capturesDir, { recursive: true, force: true }).catch(() => {});
-      }, 15_000);
 
     } finally {
       this.busy = false;
@@ -293,27 +299,39 @@ private async buildStrip(
   capturesDir: string,
   stripsDir: string,
 ): Promise<string> {
-  const logoPath = 'C:\\Users\\brand\\winbooth\\assets\\sign.png';
+    this.logger.log(`[BuildStrip] Starting buildStrip`);
+  this.logger.log(`[BuildStrip] Captured paths count: ${session.capturedPaths.length}`);
+  const logoPath = 'C:\\Users\\pod\\winbooth\\assets\\sign.png';
   const stripPath = path.join(stripsDir, `${session.id}-strip.jpg`);
 
   const photoWidth = 800;
   const photoHeight = 600;
   const totalHeight = photoHeight * 3;
 
-  // STEP 1: Process individual photos - add border + logo
+  // STEP 1: Process individual photos - add border + logo and SAVE to disk
   const processedPhotoPaths: string[] = [];
-  for (let i = 0; i < session.capturedPaths.length; i++) {
+    this.logger.log(`[BuildStrip] Starting loop for ${session.capturedPaths.length} photos`);
+    for (let i = 0; i < session.capturedPaths.length; i++) {
+    this.logger.log(`[BuildStrip] Loop iteration ${i}`);
     const originalPath = session.capturedPaths[i];
     const processedPath = originalPath.replace('.jpg', '-processed.jpg');
-    
-    await this.addBorderAndLogo(originalPath, processedPath, logoPath, 20, 50);
-    processedPhotoPaths.push(processedPath);
+    this.logger.log(`[BuildStrip] About to process: ${originalPath}`);
+    try {
+      await this.addBorderAndLogo(originalPath, processedPath, logoPath, 20, 150);
+      processedPhotoPaths.push(processedPath);
+      this.logger.log(`[BuildStrip] ✓ Shot ${i + 1} processed successfully`);
+    } catch (e) {
+      this.logger.error(`[BuildStrip] ✗ Failed to process shot ${i + 1}: ${e}`);
+      throw e;
+    }
+     this.logger.log(`[BuildStrip] Loop complete. Processed ${processedPhotoPaths.length} photos`);
+      (session as any).processedPhotoPaths = processedPhotoPaths;
   }
   
-  // Store processed paths in session for email delivery
+  // Store processed paths in session
   (session as any).processedPhotoPaths = processedPhotoPaths;
 
-  // STEP 2: Composite ORIGINAL photos into strip (no logo yet)
+  // STEP 2: Composite ORIGINAL photos into strip
   const canvas = Buffer.alloc(photoWidth * totalHeight * 3);
 
   const photos = await Promise.all(
@@ -341,31 +359,30 @@ private async buildStrip(
     .jpeg({ quality: 90 })
     .toFile(stripWithoutBorder);
 
-  this.logger.log(`[Strip] Composited to ${stripWithoutBorder}`);
-
-  // STEP 3: Add border + logo to the completed strip
-  await this.addBorderAndLogo(stripWithoutBorder, stripPath, logoPath, 20, 50);
+  // STEP 3: Add border + logo to the strip
+  await this.addBorderAndLogo(stripWithoutBorder, stripPath, logoPath, 20, 150);
   
   // Clean up temp file
-try {
-  await fs.unlink(stripWithoutBorder);
-} catch (e) {
-  this.logger.warn(`Could not delete temp file: ${stripWithoutBorder}`);
-}
+  try {
+    await fs.unlink(stripWithoutBorder);
+  } catch (e) {
+    this.logger.warn(`Could not delete temp file`);
+  }
 
   return stripPath;
 }
-
 private async addBorderAndLogo(
   imagePath: string,
   outputPath: string,
   logoPath: string,
   borderWidth: number = 20,
-  logoHeight: number = 50,
+  logoHeight: number = 100,
 ): Promise<void> {
   try {
+    this.logger.log(`[Processing] Starting: ${imagePath}`);
     const image = sharp(imagePath);
     const metadata = await image.metadata();
+    this.logger.log(`[Processing] Image metadata: ${metadata.width}x${metadata.height}`);
 
     // Add white border
     const withBorder = await image
@@ -377,16 +394,21 @@ private async addBorderAndLogo(
         background: { r: 255, g: 255, b: 255, alpha: 1 },
       })
       .toBuffer();
+      this.logger.log(`[Processing] Border added, buffer size: ${withBorder.length}`);
+
 
     // Resize logo
     const logoBuffer = await sharp(logoPath)
-      .resize(undefined, logoHeight, { withoutEnlargement: true })
+      .resize(undefined, logoHeight)
       .toBuffer();
+      this.logger.log(`[Processing] Logo resized`);
 
     const logoMetadata = await sharp(logoBuffer).metadata();
     const newWidth = (metadata.width || 0) + borderWidth * 2;
     const newHeight = (metadata.height || 0) + borderWidth * 2;
     const padding = 15;
+
+    this.logger.log(`[Processing] About to write file to: ${outputPath}`);
 
     // Add logo to bottom right
     await sharp(withBorder)
@@ -399,7 +421,13 @@ private async addBorderAndLogo(
       ])
       .toFile(outputPath);
 
-    this.logger.log(`[Processing] Added border and logo: ${outputPath}`);
+    this.logger.log(`[Processing] ✓ File written successfully to: ${outputPath}`);
+    try {
+      await fs.access(outputPath);
+      this.logger.log(`[Processing] ✓ File verified exists on disk`);
+    } catch (e) {
+      this.logger.error(`[Processing] ✗ File DOES NOT exist on disk after write!`);
+    }
   } catch (e) {
     this.logger.error(`[Processing] Error: ${e}`);
     throw e;
