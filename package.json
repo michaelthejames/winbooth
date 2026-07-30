@@ -23,6 +23,7 @@
     "@nestjs/event-emitter": "^3.1.0",
     "@nestjs/serve-static": "^5.0.5",
     "obs-websocket-js": "^5.0.8",
+    "pm2": "^7.0.3",
     "resend": "^6.18.1"
   }
 }

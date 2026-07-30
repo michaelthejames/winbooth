@@ -221,6 +221,7 @@
       box-shadow: 0 0 15px rgba(139, 0, 139, 0.3);
       display: flex;
       flex-direction: column;
+      overflow: hidden;  
     }
 
     .error-panel h2 {
@@ -233,12 +234,14 @@
     .error-log {
       flex: 1;
       overflow-y: auto;
-      font-size: 11px;
+      font-size: 16px;
       font-family: 'Courier New', monospace;
       background: rgba(0, 0, 0, 0.5);
       padding: 10px;
       border-radius: 4px;
       border-left: 3px solid #ff4444;
+      min-height: 0;
+      height: 100%; 
     }
 
     .error-entry {
@@ -293,6 +296,7 @@
       box-shadow: 0 0 15px rgba(139, 0, 139, 0.3);
       display: flex;
       flex-direction: column;
+      overflow: hidden; 
     }
 
     .history-panel h2 {
@@ -305,7 +309,8 @@
     .history-list {
       flex: 1;
       overflow-y: auto;
-      font-size: 11px;
+      font-size: 16px;
+      height: 100%; 
     }
 
     .history-item {
@@ -427,8 +432,10 @@
 <body>
   <!-- Header -->
   <header>
-    <h1>📸 BOOTH OPERATOR DASHBOARD</h1>
+    <h1>Photobooth Control Panel</h1>
     <div class="connection-status">
+      <button onclick="restartService('photo-booth-api')" style="padding: 8px 12px; margin-right: 10px; background: #8b008b; color: white; border: 1px solid #ff4444; border-radius: 4px; cursor: pointer;">Restart API</button>
+    <button onclick="restartService('parsec-server')" style="padding: 8px 12px; margin-right: 20px; background: #8b008b; color: white; border: 1px solid #ff4444; border-radius: 4px; cursor: pointer;">Restart PARSEC</button>
       <span>Socket.IO:</span>
       <span class="connection-indicator" id="connection-indicator"></span>
     </div>
@@ -436,7 +443,7 @@
 
   <!-- Health Panel -->
   <div class="health-panel">
-    <h2>🏥 BOOTH HEALTH</h2>
+    <h2>Booth Status</h2>
     <div class="health-item">
       <span>Camera</span>
       <div class="health-status">
@@ -462,15 +469,15 @@
 
   <!-- Session Panel -->
   <div class="session-panel">
-    <h2>👤 CURRENT SESSION</h2>
+    <h2>CURRENT SESSION</h2>
     <div id="session-display">
-      <div class="idle-message">🛑 WAITING FOR GUEST...</div>
+      <div class="idle-message">WAITING FOR GUEST...</div>
     </div>
   </div>
 
   <!-- Stats Panel -->
   <div class="stats-panel">
-    <h2>📊 TODAY'S STATS</h2>
+    <h2>TODAY'S STATS</h2>
     <div class="stat-item">
       <span class="stat-label">Sessions</span>
       <span class="stat-value" id="stat-sessions">0</span>
@@ -499,7 +506,7 @@
 
   <!-- Session History Panel -->
   <div class="history-panel">
-    <h2>📋 SESSION HISTORY</h2>
+    <h2>SESSION HISTORY</h2>
     <div class="history-list" id="history-list">
       <div class="error-empty">No sessions yet...</div>
     </div>
@@ -509,6 +516,18 @@
   <script>
     const socket = io();
     const startTime = Date.now();
+
+    async function restartService(service) {
+  if (!confirm(`Restart ${service}?`)) return;
+  
+  try {
+    const response = await fetch(`/session/restart-service/${service}`, { method: 'POST' });
+    const result = await response.json();
+    alert(result.message);
+  } catch (err) {
+    alert(`Failed to restart ${service}`);
+  }
+}
 
     // Connection status
     socket.on('connect', () => {

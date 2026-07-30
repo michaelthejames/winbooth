@@ -26,6 +26,7 @@ export interface BoothSession {
   email?: string;
   shotNumber: number;
   state: SessionState;
+  status?: 'success' | 'error' | 'pending';
   capturedPaths: string[];
   stripPath?: string;
   error?: string;
@@ -46,7 +47,13 @@ export class SessionService {
   private readonly logger = new Logger(SessionService.name);
   private activeSession: BoothSession | null = null;
   private busy = false;
-
+  private sessionHistory: BoothSession[] = [];
+  private errorLog: Array<{
+  timestamp: Date;
+  type: string;
+  message: string;
+  context?: string;
+}> = [];
 private async triggerHA(shotNumber: number) {
   try {
     await fetch('http://192.168.4.227:8123/api/webhook/photobooth-scare', {
@@ -110,109 +117,106 @@ private async triggerHA(shotNumber: number) {
 
   // ── Session orchestration ──────────────────────────────────────────────────
 
-  private async runSession(session: BoothSession, cameraIndex: number) {
+private async runSession(session: BoothSession, cameraIndex: number) {
+  try {
+    this.logger.log(`[SESSION START] ${session.id}`);
+    this.logger.log(`[SESSION] obsService connected: ${this.obsService.isConnected()}`);
+    const capturesDir = path.join(
+      this.config.get<string>('app.capturesDir')!,
+      session.id,
+    );
+    
+    const stripsDir = path.join(
+      this.config.get<string>('app.stripsDir')!,
+      session.id,
+    );
+    
+    await fs.mkdir(capturesDir, { recursive: true });
+    await fs.mkdir(stripsDir, { recursive: true });
+
+    // 1. Open camera session
+    const cameras = await this.cameraService.listCameras();
+    if (!cameras.length) throw new Error('No cameras detected');
+    const camera = cameras[cameraIndex] ?? cameras[0];
+
+    const nativeSession = await this.cameraService.openSession(
+      camera.index,
+      capturesDir,
+    );
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // 2. Switch OBS to Countdown scene
     try {
-      this.logger.log(`[SESSION START] ${session.id}`);
-      this.logger.log(`[SESSION] obsService connected: ${this.obsService.isConnected()}`);
-      const capturesDir = path.join(
-        this.config.get<string>('app.capturesDir')!,
-        session.id,
-      );
-      
-      const stripsDir = path.join(
-        this.config.get<string>('app.stripsDir')!,
-        session.id,
-      );
-      
-      await fs.mkdir(capturesDir, { recursive: true });
-      await fs.mkdir(stripsDir, { recursive: true });
+      await this.obsService.setScene('Countdown');
+      this.logger.log('[OBS] Switched to Countdown scene');
+    } catch (err) {
+      this.logger.warn('[OBS] Failed to switch scene', err);
+    }
 
-      // 1. Open camera session
-      const cameras = await this.cameraService.listCameras();
-      if (!cameras.length) throw new Error('No cameras detected');
-      const camera = cameras[cameraIndex] ?? cameras[0];
+    // Clear the photo sources
+    await this.obsService.updateImageSource('photo-1', '');
+    await this.obsService.updateImageSource('photo-2', '');
+    await this.obsService.updateImageSource('photo-3', '');
 
-      const nativeSession = await this.cameraService.openSession(
-        camera.index,
-        capturesDir,
-      );
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      // 2. Switch OBS to Countdown scene
-      try {
-        await this.obsService.setScene('Countdown');
-       this.logger.log('[OBS] Switched to Countdown scene');
-      } catch (err) {
-        this.logger.warn('[OBS] Failed to switch scene', err);
-       
-      }      // Clear the photo sources
-      await this.obsService.updateImageSource('photo-1', '');
-      await this.obsService.updateImageSource('photo-2', '');
-      await this.obsService.updateImageSource('photo-3', '');
-      // 3. Shoot 3 photos with countdowns between each
-      for (let shot = 1; shot <= 3; shot++) {
-        await this.triggerHA(shot);
-        await this.runCountdown(session, shot);
-        await this.takeShot(session, nativeSession, capturesDir, shot);
-}
+    // 3. Shoot 3 photos with countdowns between each
+    for (let shot = 1; shot <= 3; shot++) {
+      await this.triggerHA(shot);
+      await this.runCountdown(session, shot);
+      await this.takeShot(session, nativeSession, capturesDir, shot);
+    }
 
-      // 4. Composite strip
-      this.logger.log(`[SessionService] About to call buildStrip`);
-      this.setState(session, 'processing');
-      this.logger.log(`[SessionService] Calling buildStrip now`);
-      const stripPath = await this.buildStrip(session, capturesDir, stripsDir);
-      this.logger.log(`[SessionService] buildStrip returned: ${stripPath}`);
-      session.stripPath = stripPath;
+    // 4. Composite strip
+    this.setState(session, 'processing');
+    const stripPath = await this.buildStrip(session, capturesDir, stripsDir);
+    session.stripPath = stripPath;
 
-      // 6. Switch to Delivery scene and show strip
-    // 6. Switch to Delivery scene and show a photo (not the strip)
+    // 5. Switch to Delivery scene
     try {
       await this.obsService.setScene('Delivery');
       
       const processedPaths = (session as any).processedPhotoPaths || [];
-      this.logger.log(`[DEBUG] Processed paths: ${JSON.stringify(processedPaths)}`);
-      
       if (processedPaths.length > 0) {
-        // Show photo 2 (middle)
         const fullPath = processedPaths[1];
-        this.logger.log(`[DEBUG] Full path: ${fullPath}`);
-        
         await this.obsService.updateImageSource('strip-image', fullPath);
-    this.logger.log(`[OBS] Switched to Delivery scene, showing photo: ${fullPath}`);
-  } else {
-    this.logger.warn('[OBS] No processed photos found');
-  }
-} catch (err) {
-  this.logger.error('[OBS] Failed to show delivery scene', err);
-}
-
-      // 6. Show strip for 5 seconds
-      await sleep(5000);
-
-      try {
-        await this.obsService.setScene('Idle');
-        this.logger.log('[OBS] Reset to Idle scene');
-        } catch (err) {
-        this.logger.warn('[OBS] Failed to reset to Idle', err);
+        this.logger.log(`[OBS] Showing photo: ${fullPath}`);
       }
+    } catch (err) {
+      this.logger.error('[OBS] Failed to show delivery scene', err);
+    }
 
-      // 7. Deliver
-      this.setState(session, 'delivering');
-      await this.deliveryService.deliver({
+    // 6. Show delivery for 5 seconds
+    await sleep(5000);
+
+    try {
+      await this.obsService.setScene('Idle');
+      this.logger.log('[OBS] Reset to Idle scene');
+    } catch (err) {
+      this.logger.warn('[OBS] Failed to reset to Idle', err);
+    }
+
+    // 7. Send email
+    this.setState(session, 'delivering');
+    await this.deliveryService.deliver({
       name: session.name,
       email: session.email,
       stripPath: stripPath,
-      processedPhotoPaths: (session as any).processedPhotoPaths || [],  // Pass it here
+      processedPhotoPaths: (session as any).processedPhotoPaths || [],
       sessionId: session.id,
-});
+    });
 
-      this.setState(session, 'done');
+    // Success
+    this.setState(session, 'done');
+    session.status = 'success';
 
-      // Cleanup captures after a delay (keep the strip)
-
-    } finally {
-      this.busy = false;
-    }
+  } catch (e) {
+    this.logError('session', String(e));
+    session.status = 'error';
+    this.setState(session, 'error', { error: String(e) });
+  } finally {
+    this.sessionHistory.push({ ...session });
+    this.busy = false;
   }
+}
 
   // ── Countdown ──────────────────────────────────────────────────────────────
 
@@ -227,7 +231,6 @@ private async triggerHA(shotNumber: number) {
       this.logger.warn('[OBS] Failed to switch to Countdown', err);
     }
   }  
-    await this.triggerHA(shotNumber);
     for (let count = 3; count >= 1; count--) {
       this.logger.log(`[Countdown] ${count} for session ${session.id}`);
       
@@ -254,41 +257,47 @@ private async triggerHA(shotNumber: number) {
       shotNumber,
       total: 3,
     });
-
+    try {
+      await this.obsService.setScene('Countdown');
+    } catch (err) {
+      this.logError('obs', 'Failed to switch to Countdown scene', String(err));
+    }
     await sleep(500); // Show BOO! for half a second
   }
 
   // ── Capture ────────────────────────────────────────────────────────────────
 
-  private async takeShot(
-    session: BoothSession,
-    nativeSession: ReturnType<CameraService['getActiveSession']>,
-    capturesDir: string,
-    shotNumber: number,
-  ): Promise<void> {
-    this.setState(session, 'shooting');
-    this.emit('flash', { sessionId: session.id });
+private async takeShot(
+  session: BoothSession,
+  nativeSession: ReturnType<CameraService['getActiveSession']>,
+  capturesDir: string,
+  shotNumber: number,
+): Promise<void> {
+  this.setState(session, 'shooting');
+  this.emit('flash', { sessionId: session.id });
 
-    if (!nativeSession) {
-      throw new Error('No active camera session');
-    }
+  if (!nativeSession) {
+    throw new Error('No active camera session');
+  }
 
-    const filePath = await nativeSession.takePicture(capturesDir);
-  session.capturedPaths.push(filePath);
-  const photoUrl = `/camera/captures/${session.id}/${path.basename(filePath)}`;
-
-this.emit('preview', {
-    sessionId: session.id,
-    shotNumber,
-    filePath: photoUrl,
-  });
-
-  // Update OBS image source with actual file path (not HTTP URL)
   try {
+    const filePath = await nativeSession.takePicture(capturesDir);
+    session.capturedPaths.push(filePath);
+    
+    const photoUrl = `/camera/captures/${session.id}/${path.basename(filePath)}`;
+    
+    this.emit('preview', {
+      sessionId: session.id,
+      shotNumber,
+      filePath: photoUrl,
+    });
+
+    // Update OBS image source
     await this.obsService.updateImageSource(`photo-${shotNumber}`, filePath);
     this.logger.log(`[OBS] Updated photo-${shotNumber}: ${filePath}`);
-  } catch (err) {
-    this.logger.warn(`[OBS] Failed to update photo`, err);
+  } catch (e) {
+    this.logError('camera', `Failed to capture photo ${shotNumber}`, String(e));
+    throw e;
   }
 }
 
@@ -307,7 +316,7 @@ private async buildStrip(
   const photoWidth = 800;
   const photoHeight = 600;
   const totalHeight = photoHeight * 3;
-
+  
   // STEP 1: Process individual photos - add border + logo and SAVE to disk
   const processedPhotoPaths: string[] = [];
     this.logger.log(`[BuildStrip] Starting loop for ${session.capturedPaths.length} photos`);
@@ -317,7 +326,7 @@ private async buildStrip(
     const processedPath = originalPath.replace('.jpg', '-processed.jpg');
     this.logger.log(`[BuildStrip] About to process: ${originalPath}`);
     try {
-      await this.addBorderAndLogo(originalPath, processedPath, logoPath, 20, 150);
+      await this.addBorderAndLogo(originalPath, processedPath, logoPath, 20, 400);
       processedPhotoPaths.push(processedPath);
       this.logger.log(`[BuildStrip] ✓ Shot ${i + 1} processed successfully`);
     } catch (e) {
@@ -368,9 +377,10 @@ private async buildStrip(
   } catch (e) {
     this.logger.warn(`Could not delete temp file`);
   }
-
   return stripPath;
+  
 }
+
 private async addBorderAndLogo(
   imagePath: string,
   outputPath: string,
@@ -423,6 +433,7 @@ private async addBorderAndLogo(
 
     this.logger.log(`[Processing] ✓ File written successfully to: ${outputPath}`);
     try {
+      
       await fs.access(outputPath);
       this.logger.log(`[Processing] ✓ File verified exists on disk`);
     } catch (e) {
@@ -432,6 +443,7 @@ private async addBorderAndLogo(
     this.logger.error(`[Processing] Error: ${e}`);
     throw e;
   }
+  
 }
   // ── Event helpers ──────────────────────────────────────────────────────────
 
@@ -444,7 +456,23 @@ private async addBorderAndLogo(
       ...payload,
     });
   }
+  private logError(type: string, message: string, context?: string) {
+  this.errorLog.push({
+    timestamp: new Date(),
+    type,
+    message,
+    context,
+  });
+  this.logger.error(`[${type}] ${message}${context ? ` - ${context}` : ''}`);
+}
 
+    getSessionHistory(): BoothSession[] {
+      return this.sessionHistory;
+}
+
+    getErrorLog() {
+      return this.errorLog;
+}
   private emit(event: string, payload: Record<string, unknown>) {
     this.events.emit(event, payload);
     this.logger.debug(`[${event}] ${JSON.stringify(payload)}`);

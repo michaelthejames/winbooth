@@ -5,10 +5,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import * as express from 'express';
 import path from 'path/win32';
+import { ObsService } from './obs/obs.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  
+  const obsService = app.get(ObsService);
 
   // Global validation via class-validator DTOs
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -29,9 +30,9 @@ async function bootstrap() {
   app.use('/camera/captures', express.static(capturesPath));
   console.log(`📁 Serving captures from: ${capturesPath}`);
 
-  const port = process.env.PORT ?? 3000;
+  const port = process.env.PORT ?? 3001;
   await app.listen(port);
   console.log(`\n🎞  Photo booth API running on http://localhost:${port}`);
 }
-
 bootstrap();
+

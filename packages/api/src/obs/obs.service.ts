@@ -22,9 +22,7 @@ export class ObsService implements OnModuleInit {
       password: this.configService.get<string>('obs.password'),
     };
   }
-
-
-/** 
+/*
  * Update image source (works for both Image and Browser sources)
  */
 async updateImageSource(sourceName: string, filePathOrUrl: string): Promise<void> {
@@ -120,9 +118,7 @@ async updateImageSource(sourceName: string, filePathOrUrl: string): Promise<void
     return this.connected;
   }
 
-  /**
-   * Switch to a scene
-   */
+
   /**
    * Switch to a scene
    */
