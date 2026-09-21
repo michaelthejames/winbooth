@@ -447,6 +447,12 @@ private async addBorderAndLogo(
 }
   // ── Event helpers ──────────────────────────────────────────────────────────
 
+  resetKiosk() {
+  // Emit event to OBS to reset the kiosk script
+  this.emit('kiosk-reset', {});
+  this.logger.log('[SESSION] Kiosk reset triggered');
+}
+
   private setState(session: BoothSession, state: SessionState, payload?: Record<string, unknown>) {
     session.state = state;
     this.logger.log(`[StateChange] ${state} for session ${session.id}`);
