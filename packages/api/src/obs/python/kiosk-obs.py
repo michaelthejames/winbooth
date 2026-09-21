@@ -50,6 +50,21 @@ def on_press(key):
     global current_input, state, name, email
     
     try:
+        # Hotkeys - handle first, before character input
+        if key == keyboard.Key.f5:
+            reset()
+            return
+        
+        if key == keyboard.Key.esc:
+            current_input = ""
+            if state == "name":
+                update_text_source("Name: ")
+            elif state == "email":
+                update_text_source(f"Name: {name}\nEmail: ")
+            print("[kiosk-obs] Input cancelled")
+            return
+        
+        # Regular input handling
         if key == keyboard.Key.enter:
             if state == "name" and current_input.strip():
                 name = current_input
@@ -60,7 +75,6 @@ def on_press(key):
                 email = current_input
                 state = "confirm"
                 update_text_source(f"Name: {name}\nEmail: {email}\nProcessing...")
-                # Submit in background so keyboard isn't blocked
                 thread = threading.Thread(target=submit_in_thread)
                 thread.daemon = True
                 thread.start()
@@ -94,14 +108,15 @@ def on_press(key):
     except Exception as e:
         print(f"Error: {e}")
 
-
 def reset():
     global current_input, state, name, email
     current_input = ""
     state = "name"
     name = ""
     email = ""
-    update_text_source("Name: ")  # Change this line to show the label
+    update_text_source("Name: ")
+    print("[kiosk-obs] Kiosk reset via F5")
+
 
 # Start listening when script loads
 listener = None
