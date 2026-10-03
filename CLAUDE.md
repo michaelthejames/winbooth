@@ -32,7 +32,7 @@ Four separate processes cooperate:
 
 Only one session runs at a time, guarded by the `busy` flag. `POST /session/start` returns immediately, and `runSession` continues asynchronously:
 
-open camera (SaveTo=Host) → OBS scene `Countdown` → for each shot (`session.shots`, 1 or 3, default 3): Home Assistant webhook (payload `{shot, scary, timestamp}`), 3-2-1-"BOO!" countdown, trigger PARSEC, copy the image into `CAPTURES_DIR/<sessionId>/` → `processPhotos` (sharp: per-photo border + `assets/sign.png` logo, saved as `*-processed.jpg`) → `buildStrip`, 3-shot sessions only (a vertical strip in `STRIPS_DIR/<sessionId>/`) → OBS scene `Delivery`, showing the middle (or only) processed photo in `strip-image` → 5s → OBS scene `Idle` → email via Resend (`delivery.service.ts`): the processed photos, plus the strip when there is one.
+open camera (SaveTo=Host) → OBS scene `Countdown` → for each shot (`session.shots`, 1 or 3, default 3): Home Assistant webhook (payload `{shot, scary, timestamp}`), 3-2-1 countdown (the PARSEC trigger fires `SHUTTER_LEAD_MS`, default 1000, before the count ends, to absorb shutter lag; `flash` is emitted when the count ends, and `countdown.html` shows a white flash), copy the image into `CAPTURES_DIR/<sessionId>/` → `processPhotos` (sharp: per-photo border + `assets/sign.png` logo, saved as `*-processed.jpg`) → `buildStrip`, 3-shot sessions only (a vertical strip in `STRIPS_DIR/<sessionId>/`) → OBS scene `Delivery`, showing the middle (or only) processed photo in `strip-image` → 5s → OBS scene `Idle` → email via Resend (`delivery.service.ts`): the processed photos, plus the strip when there is one.
 
 Session history and the error log are kept in memory only, so they are lost on restart.
 

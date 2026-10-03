@@ -15,6 +15,8 @@ const KIOSK_RESET_HOTKEY = 'kiosk_reset';
 
 const LOGO_PATH = 'C:\\Users\\pod\\winbooth\\assets\\sign.png';
 
+const COUNTDOWN_MS = 3000; // 3-2-1, one second each
+
 // ── Session states ────────────────────────────────────────────────────────────
 export type SessionState =
   | 'idle'
@@ -186,8 +188,12 @@ private async runSession(session: BoothSession, cameraIndex: number) {
     // 3. Shoot 1 or 3 photos with countdowns between each
     for (let shot = 1; shot <= session.shots; shot++) {
       await this.triggerHA(shot, session.scary);
-      await this.runCountdown(session, shot);
-      await this.takeShot(session, nativeSession, capturesDir, shot);
+      // The trigger fires during the countdown (see runCountdown) to absorb shutter lag
+      let capture: Promise<string>;
+      await this.runCountdown(session, shot, () => {
+        capture = this.startCapture(nativeSession, capturesDir);
+      });
+      await this.takeShot(session, capture!, shot);
     }
 
     // 4. Border + logo on each photo; 3-shot sessions also get a composited strip
@@ -251,7 +257,12 @@ private async runSession(session: BoothSession, cameraIndex: number) {
 
   // ── Countdown ──────────────────────────────────────────────────────────────
 
-  private async runCountdown(session: BoothSession, shotNumber: number) {
+  /**
+   * 3-2-1, one second apart, then takeShot() emits 'flash' when the count ends.
+   * The camera takes roughly a second from trigger to shutter, so fireTrigger runs
+   * app.shutterLeadMs before the end of the count; the shutter then lands near the flash.
+   */
+  private async runCountdown(session: BoothSession, shotNumber: number, fireTrigger: () => void) {
     this.setState(session, 'countdown');
 
     // Already on Countdown after shot 1 (a no-op in OBS); re-set each shot in case
@@ -262,10 +273,8 @@ private async runSession(session: BoothSession, cameraIndex: number) {
       this.logError('obs', 'Failed to switch to Countdown scene', String(err));
     }
 
-    // 3-2-1, then takeShot() emits 'flash' (white flash on countdown.html) as the shutter fires
-    for (let count = 3; count >= 1; count--) {
+    const tick = (count: number) => () => {
       this.logger.log(`[Countdown] ${count} for session ${session.id}`);
-
       // Emit countdown event for the overlay and remote displays
       this.emit('countdown', {
         sessionId: session.id,
@@ -273,28 +282,54 @@ private async runSession(session: BoothSession, cameraIndex: number) {
         shotNumber,
         total: session.shots,
       });
+    };
 
-      await sleep(1000);
+    const lead = Math.min(Math.max(this.config.get<number>('app.shutterLeadMs') ?? 0, 0), COUNTDOWN_MS);
+    const timeline = [
+      { at: 0, run: tick(3) },
+      { at: 1000, run: tick(2) },
+      { at: 2000, run: tick(1) },
+      { at: COUNTDOWN_MS - lead, run: () => {
+        this.logger.log(`[Countdown] Trigger (${lead}ms before end of count)`);
+        fireTrigger();
+      } },
+    ].sort((a, b) => a.at - b.at); // stable: a tick stays ahead of a trigger at the same time
+
+    const start = Date.now();
+    const until = (at: number) => sleep(Math.max(0, start + at - Date.now()));
+    for (const step of timeline) {
+      await until(step.at);
+      step.run();
     }
+    await until(COUNTDOWN_MS);
   }
 
   // ── Capture ────────────────────────────────────────────────────────────────
 
-private async takeShot(
-  session: BoothSession,
+// Fire the camera now; the result is awaited later in takeShot()
+private startCapture(
   nativeSession: ReturnType<CameraService['getActiveSession']>,
   capturesDir: string,
+): Promise<string> {
+  const capture = nativeSession
+    ? nativeSession.takePicture(capturesDir)
+    : Promise.reject(new Error('No active camera session'));
+  // Mark handled so a failure before takeShot() awaits it isn't an unhandled rejection
+  // (which would crash Node); the await in takeShot() still throws it
+  capture.catch(() => {});
+  return capture;
+}
+
+private async takeShot(
+  session: BoothSession,
+  capture: Promise<string>,
   shotNumber: number,
 ): Promise<void> {
   this.setState(session, 'shooting');
   this.emit('flash', { sessionId: session.id });
 
-  if (!nativeSession) {
-    throw new Error('No active camera session');
-  }
-
   try {
-    const filePath = await nativeSession.takePicture(capturesDir);
+    const filePath = await capture;
     session.capturedPaths.push(filePath);
     
     const photoUrl = `/camera/captures/${session.id}/${path.basename(filePath)}`;

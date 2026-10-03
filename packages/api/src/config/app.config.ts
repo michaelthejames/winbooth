@@ -10,6 +10,10 @@ export default registerAs('app', () => ({
   // Camera server (PARSEC)
   parsecUrl: process.env.PARSEC_URL ?? 'https://localhost:3000',
 
+  // How long before the end of the 3-2-1 to fire the camera, to absorb trigger-to-shutter
+  // lag so the shutter lands near the on-screen flash (0 = fire at the flash)
+  shutterLeadMs: parseInt(process.env.SHUTTER_LEAD_MS ?? '1000', 10),
+
   // OBS websocket
   obs: {
     host: process.env.OBS_HOST ?? 'localhost',
