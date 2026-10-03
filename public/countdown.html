@@ -1,30 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-<link href="https://fonts.googleapis.com/css2?family=Rubik+Maze&display=swap" rel="stylesheet">
+<!-- Served locally (license: RubikMaze-OFL.txt); preload + font-display: block + the
+     fonts.load() gate below mean digits never render in a fallback font -->
+<link rel="preload" href="/RubikMaze-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <style>
-    body { margin: 0; background: transparent; }
+    @font-face {
+      font-family: 'Rubik Maze';
+      src: url('/RubikMaze-Regular.ttf') format('truetype');
+      font-display: block;
+    }
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
     #countdown {
       font-family: 'Rubik Maze', system-ui;
+      font-size: 300px;
+      color: rgb(195, 198, 25);
       font-weight: 400;
       font-style: normal;
+      text-align: center;
+    }
+    /* Full-screen white flash at the shutter */
+    #flash {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #flash.go { animation: flash 450ms ease-out; }
+    @keyframes flash {
+      0%   { opacity: 1; }
+      30%  { opacity: 1; }
+      100% { opacity: 0; }
     }
 </style>
 </head>
 <body>
-  <div id="countdown" style="font-family: 'Rubik Maze', system-ui; font-size: 300px; color: rgb(195, 198, 25); font-weight: 400; font-style: normal; text-align:center"></div>
+  <div id="countdown"></div>
+  <div id="flash"></div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
-    
-    socket.on('stateChange', (data) => {
-      if (data.state === 'countdown') {
-        document.getElementById('countdown').textContent = '';
-      }
+    const countdownEl = document.getElementById('countdown');
+    const flashEl = document.getElementById('flash');
+
+    // Hold digits until the font is ready (give up after 1.5s rather than show nothing)
+    let fontReady = false;
+    let pendingCount = null;
+    Promise.race([
+      document.fonts.load('300px "Rubik Maze"'),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]).finally(() => {
+      fontReady = true;
+      if (pendingCount !== null) countdownEl.textContent = pendingCount;
     });
-    
-    socket.on('countdown', (data) => {
-      document.getElementById('countdown').textContent = data.count;
+
+    function showCount(count) {
+      if (fontReady) countdownEl.textContent = count;
+      else pendingCount = count;
+    }
+
+    function clearCount() {
+      pendingCount = null;
+      countdownEl.textContent = '';
+    }
+
+    const socket = io();
+
+    socket.on('stateChange', (data) => {
+      if (data.state === 'countdown') clearCount();
+    });
+
+    socket.on('countdown', (data) => showCount(data.count));
+
+    socket.on('flash', () => {
+      clearCount();
+      flashEl.classList.remove('go');
+      void flashEl.offsetWidth; // restart the animation on back-to-back shots
+      flashEl.classList.add('go');
     });
   </script>
 </body>

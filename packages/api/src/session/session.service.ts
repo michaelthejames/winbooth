@@ -253,21 +253,20 @@ private async runSession(session: BoothSession, cameraIndex: number) {
 
   private async runCountdown(session: BoothSession, shotNumber: number) {
     this.setState(session, 'countdown');
-    
-    if (shotNumber === 1) {
+
+    // Already on Countdown after shot 1 (a no-op in OBS); re-set each shot in case
+    // something else switched the scene
     try {
       await this.obsService.setScene('Countdown');
-      this.logger.log('[OBS] Switched to Countdown scene');
     } catch (err) {
-      this.logger.warn('[OBS] Failed to switch to Countdown', err);
+      this.logError('obs', 'Failed to switch to Countdown scene', String(err));
     }
-  }  
+
+    // 3-2-1, then takeShot() emits 'flash' (white flash on countdown.html) as the shutter fires
     for (let count = 3; count >= 1; count--) {
       this.logger.log(`[Countdown] ${count} for session ${session.id}`);
-      
-      // Update OBS countdown text overlay
 
-      // Emit countdown event for remote displays
+      // Emit countdown event for the overlay and remote displays
       this.emit('countdown', {
         sessionId: session.id,
         count,
@@ -277,23 +276,6 @@ private async runSession(session: BoothSession, cameraIndex: number) {
 
       await sleep(1000);
     }
-
-    // SMILE!
-    this.logger.log(`[Countdown] SMILE! for session ${session.id}`);
-    
-
-    this.emit('countdown', {
-      sessionId: session.id,
-      count: 'BOO!',
-      shotNumber,
-      total: session.shots,
-    });
-    try {
-      await this.obsService.setScene('Countdown');
-    } catch (err) {
-      this.logError('obs', 'Failed to switch to Countdown scene', String(err));
-    }
-    await sleep(500); // Show BOO! for half a second
   }
 
   // ── Capture ────────────────────────────────────────────────────────────────
