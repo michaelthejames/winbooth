@@ -66,7 +66,8 @@ export class SessionService {
   message: string;
   context?: string;
 }> = [];
-private async triggerHA(shotNumber: number, scary: boolean) {
+// Webhook payload { shot, shots, scary, timestamp }; HA automations decide which shots scare
+private async triggerHA(session: BoothSession, shotNumber: number) {
   try {
     const webhookUrl = this.config.get<string>('app.homeAssistant.webhookUrl');
     
@@ -80,7 +81,8 @@ private async triggerHA(shotNumber: number, scary: boolean) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         shot: shotNumber,
-        scary,
+        shots: session.shots,
+        scary: session.scary,
         timestamp: new Date().toISOString()
       })
     });
@@ -187,7 +189,7 @@ private async runSession(session: BoothSession, cameraIndex: number) {
 
     // 3. Shoot 1 or 3 photos with countdowns between each
     for (let shot = 1; shot <= session.shots; shot++) {
-      await this.triggerHA(shot, session.scary);
+      await this.triggerHA(session, shot);
       // The trigger fires during the countdown (see runCountdown) to absorb shutter lag
       let capture: Promise<string>;
       await this.runCountdown(session, shot, () => {
