@@ -115,21 +115,33 @@ def reset():
     name = ""
     email = ""
     update_text_source("Name: ")
-    print("[kiosk-obs] Kiosk reset via F5")
+    print("[kiosk-obs] Kiosk reset")
+
+
+def on_reset_hotkey(pressed):
+    """Fired by the API via obs-websocket TriggerHotkeyByName (dashboard reset button)"""
+    if pressed:
+        reset()
 
 
 # Start listening when script loads
 listener = None
+reset_hotkey_id = None
 
 def script_load(settings):
-    global listener
+    global listener, reset_hotkey_id
     print("Kiosk script loaded")
     listener = keyboard.Listener(on_press=on_press)
     listener.start()
+    # Name must match KIOSK_RESET_HOTKEY in session.service.ts
+    reset_hotkey_id = obs.obs_hotkey_register_frontend("kiosk_reset", "Reset Kiosk Input", on_reset_hotkey)
     update_text_source("Name: ")
 
 def script_unload():
-    global listener
+    global listener, reset_hotkey_id
     if listener:
         listener.stop()
+    if reset_hotkey_id is not None:
+        obs.obs_hotkey_unregister(on_reset_hotkey)
+        reset_hotkey_id = None
     print("Kiosk script unloaded")

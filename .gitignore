@@ -1,9 +1,4 @@
-# Canon SDK — proprietary, must be downloaded separately by each dev
-packages/camera-addon/edsdk/
-
 # Build artifacts
-packages/camera-addon/build/
-packages/camera-addon/binding/
 packages/api/dist/
 
 # Dependencies
@@ -11,7 +6,7 @@ node_modules/
 
 # Secrets
 .env
-.env.dev
+.env.*
 *.env
 !.env.example
 

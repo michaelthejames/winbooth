@@ -553,33 +553,31 @@ async function resetKiosk() {
 
     // Session updates
     socket.on('session-started', (data) => {
-      updateSessionDisplay(data);
+      updateSessionDisplay({ status: 'waiting', name: data.name, email: data.email });
     });
 
     socket.on('countdown', (data) => {
       updateSessionDisplay({ status: 'countdown', count: data.count });
     });
 
-    socket.on('photo-taken', (data) => {
-      updateSessionDisplay({ status: 'shooting', photoNumber: data.shot, totalPhotos: 3 });
+    socket.on('preview', (data) => {
+      updateSessionDisplay({ status: 'shooting', photoNumber: data.shotNumber, totalPhotos: 3 });
     });
 
-    socket.on('session-done', (data) => {
-      updateSessionDisplay({ status: 'done' });
-      setTimeout(() => {
-        clearSessionDisplay();
-      }, 5000);
-      loadHistory();
-      updateStats();
-    });
-
-    socket.on('session-error', (data) => {
-      updateSessionDisplay({ status: 'error', error: data.message });
-    });
-
-    // Health updates
-    socket.on('health-status', (health) => {
-      updateHealth(health);
+    socket.on('stateChange', (data) => {
+      if (data.state === 'processing' || data.state === 'delivering') {
+        updateSessionDisplay({ status: data.state });
+      } else if (data.state === 'done') {
+        updateSessionDisplay({ status: 'done' });
+        setTimeout(() => {
+          clearSessionDisplay();
+        }, 5000);
+        loadHistory();
+        updateStats();
+      } else if (data.state === 'error') {
+        updateSessionDisplay({ status: 'error', error: data.error });
+        loadHistory();
+      }
     });
 
     // Error alerts
@@ -647,6 +645,10 @@ async function resetKiosk() {
           <div class="photo-counter">${data.photoNumber} / ${data.totalPhotos}</div>
           <div style="font-size: 14px; color: #bb88bb;">Taking photos...</div>
         `;
+      } else if (data.status === 'processing' || data.status === 'delivering') {
+        display.innerHTML = `
+          <div class="session-status">${data.status === 'processing' ? '🖼️ BUILDING STRIP...' : '📧 SENDING EMAIL...'}</div>
+        `;
       } else if (data.status === 'done') {
         display.innerHTML = `
           <div style="font-size: 16px; color: #00ff00; font-weight: bold;">✓ SESSION COMPLETE</div>
@@ -704,7 +706,7 @@ async function resetKiosk() {
       }
 
       list.innerHTML = sessions.map(s => {
-        const time = new Date(s.timestamp).toLocaleTimeString();
+        const time = new Date(s.createdAt).toLocaleTimeString();
         const isError = s.status === 'error';
         return `
           <div class="history-item ${isError ? 'error' : ''}">
@@ -713,7 +715,7 @@ async function resetKiosk() {
             <div class="history-time">${time}</div>
             <div>
               <span class="history-status ${s.status}">${s.status.toUpperCase()}</span>
-              <button class="resend-btn" onclick="resendEmail('${s.sessionId}', '${s.email}')">📧 Resend</button>
+              <button class="resend-btn" onclick="resendEmail('${s.id}', '${s.email}')">📧 Resend</button>
             </div>
           </div>
         `;

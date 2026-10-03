@@ -42,4 +42,14 @@ export class BoothGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log('[Gateway] Broadcasting stateChange:', payload);
     this.server.emit('stateChange', payload);
   }
+
+  @OnEvent('session-started')
+  onSessionStarted(payload: unknown) {
+    this.server.emit('session-started', payload);
+  }
+
+  @OnEvent('error-alert')
+  onErrorAlert(payload: unknown) {
+    this.server.emit('error-alert', payload);
+  }
 }

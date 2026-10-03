@@ -10,6 +10,9 @@ import { DeliveryService } from '../delivery/delivery.service';
 import { ObsService } from '../obs/obs.service';
 import { access } from 'fs/promises';
 
+// Must match the name kiosk-obs.py registers with obs_hotkey_register_frontend
+const KIOSK_RESET_HOTKEY = 'kiosk_reset';
+
 // ── Session states ────────────────────────────────────────────────────────────
 export type SessionState =
   | 'idle'
@@ -111,6 +114,11 @@ private async triggerHA(shotNumber: number) {
       shotNumber: 0,
     };
     this.activeSession = session;
+    this.emit('session-started', {
+      sessionId: session.id,
+      name: session.name,
+      email: session.email,
+    });
 
     // Run async — the caller gets the session ID immediately
     this.runSession(session, dto.cameraIndex ?? 0).catch((err) => {
@@ -454,11 +462,11 @@ private async addBorderAndLogo(
 }
   // ── Event helpers ──────────────────────────────────────────────────────────
 
-  resetKiosk() {
-  // Emit event to OBS to reset the kiosk script
-  this.emit('kiosk-reset', {});
-  this.logger.log('[SESSION] Kiosk reset triggered');
-}
+  // Fires the hotkey registered by kiosk-obs.py, which clears its name/email input
+  async resetKiosk() {
+    await this.obsService.triggerHotkey(KIOSK_RESET_HOTKEY);
+    this.logger.log('[SESSION] Kiosk reset triggered');
+  }
 
   private setState(session: BoothSession, state: SessionState, payload?: Record<string, unknown>) {
     session.state = state;
@@ -470,12 +478,14 @@ private async addBorderAndLogo(
     });
   }
   private logError(type: string, message: string, context?: string) {
-  this.errorLog.push({
+  const entry = {
     timestamp: new Date(),
     type,
     message,
     context,
-  });
+  };
+  this.errorLog.push(entry);
+  this.emit('error-alert', entry);
   this.logger.error(`[${type}] ${message}${context ? ` - ${context}` : ''}`);
 }
 

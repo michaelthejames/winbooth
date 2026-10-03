@@ -21,9 +21,9 @@ export class ObsService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private configService: ConfigService) {
     this.config = {
-      host: this.configService.get<string>('obs.host') || 'localhost',
-      port: this.configService.get<number>('obs.port') || 4444,
-      password: this.configService.get<string>('obs.password'),
+      host: this.configService.get<string>('app.obs.host') || 'localhost',
+      port: this.configService.get<number>('app.obs.port') || 4444,
+      password: this.configService.get<string>('app.obs.password'),
     };
   }
 
@@ -231,6 +231,19 @@ export class ObsService implements OnModuleInit, OnModuleDestroy {
       throw new Error(`Source ${sourceName} not found in scene ${sceneName}`);
     }
     return item.sceneItemId;
+  }
+
+  /**
+   * Trigger a hotkey by its registered name (e.g. one registered by an OBS script)
+   */
+  async triggerHotkey(hotkeyName: string): Promise<void> {
+    try {
+      await this.call('TriggerHotkeyByName', { hotkeyName });
+      this.logger.log(`[OBS] ✓ Triggered hotkey: ${hotkeyName}`);
+    } catch (err) {
+      this.logger.error(`[OBS] ✗ Failed to trigger hotkey ${hotkeyName}`, err);
+      throw err;
+    }
   }
 
   /**

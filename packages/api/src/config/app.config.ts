@@ -10,6 +10,13 @@ export default registerAs('app', () => ({
   // Camera server (PARSEC)
   parsecUrl: process.env.PARSEC_URL ?? 'https://localhost:3000',
 
+  // OBS websocket
+  obs: {
+    host: process.env.OBS_HOST ?? 'localhost',
+    port: parseInt(process.env.OBS_PORT ?? '4444', 10),
+    password: process.env.OBS_PASSWORD || undefined,
+  },
+
   // Email delivery (Resend)
   resend: {
     apiKey: process.env.RESEND_API_KEY ?? '',

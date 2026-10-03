@@ -136,6 +136,16 @@ async resendEmail(@Param('sessionId') sessionId: string) {
   
   return { success: true, message: 'Email resent' };
 }
+@Post('reset-kiosk')
+async resetKiosk() {
+  try {
+    await this.sessionService.resetKiosk();
+    return { success: true, message: 'Kiosk reset' };
+  } catch (err) {
+    return { success: false, message: `Kiosk reset failed: ${err}` };
+  }
+}
+
 @Post('restart-service/:service')
 async restartService(@Param('service') service: string) {
   return new Promise((resolve) => {
