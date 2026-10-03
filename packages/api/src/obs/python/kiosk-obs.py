@@ -23,6 +23,8 @@ SHOTS_SCENE = "Shots Select"
 SHOTS_OPTIONS = [("One Shot Option", "1"), ("Three Shots Option", "3")]      # side by side: Left/Right
 # Filter on each option source, enabled only while that option is focused
 FOCUS_FILTER = "Focus"
+# Shown after the last choice while the API starts the session (static text in OBS)
+PREPARE_SCENE = "Prepare"
 
 # Index of the focused option on each choice screen
 scary_focus = 0   # default: Scary
@@ -114,6 +116,8 @@ def go_to(new_state):
         set_scene(SCARY_SCENE)
     elif new_state == "shots":
         set_scene(SHOTS_SCENE)
+    elif new_state == "confirm":
+        set_scene(PREPARE_SCENE)  # the API switches to Countdown once the camera is ready
     elif old_state in ("scary", "shots"):
         set_scene(INTAKE_SCENE)
 
@@ -126,16 +130,18 @@ def submit_in_thread():
             timeout=10
         )
         if response.status_code in [200, 201]:
-            render("[OK] Session started!\nHave a seat!")
+            # Prepare scene is showing; the API takes the display from here
             import time
             time.sleep(8)
             reset()
         else:
+            set_scene(INTAKE_SCENE)  # leave Prepare so the error is visible
             update_text_source("[ERROR] Failed to start session")
             import time
             time.sleep(2)
             reset()
     except Exception as e:
+        set_scene(INTAKE_SCENE)
         update_text_source("[ERROR] Connection error")
         import time
         time.sleep(2)

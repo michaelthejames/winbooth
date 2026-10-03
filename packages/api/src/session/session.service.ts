@@ -237,6 +237,10 @@ private async runSession(session: BoothSession, cameraIndex: number) {
 
   } catch (e) {
     this.logError('session', String(e));
+    // Don't leave the display stuck on Prepare/Countdown/Delivery
+    await this.obsService.setScene('Idle').catch((err) =>
+      this.logger.warn(`[OBS] Failed to reset to Idle after error: ${err}`),
+    );
     session.status = 'error';
     this.setState(session, 'error', { error: String(e) });
   } finally {
