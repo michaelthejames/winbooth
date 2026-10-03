@@ -435,6 +435,7 @@
     <h1>Photobooth Control Panel</h1>
     <div class="connection-status">
       <button onclick="resetKiosk()" style="padding: 8px 12px; margin-right: 10px; background: #8b008b; color: white; border: 1px solid #ff4444; border-radius: 4px; cursor: pointer;">🔄 Reset Kiosk</button>
+      <button onclick="goToIdle()" style="padding: 8px 12px; margin-right: 10px; background: #8b008b; color: white; border: 1px solid #ff4444; border-radius: 4px; cursor: pointer;">🏠 Go to Idle</button>
       <button onclick="restartService('photo-booth-api')" style="padding: 8px 12px; margin-right: 10px; background: #8b008b; color: white; border: 1px solid #ff4444; border-radius: 4px; cursor: pointer;">Restart API</button>
     <button onclick="restartService('parsec-server')" style="padding: 8px 12px; margin-right: 20px; background: #8b008b; color: white; border: 1px solid #ff4444; border-radius: 4px; cursor: pointer;">Restart PARSEC</button>
       <span>Socket.IO:</span>
@@ -538,6 +539,21 @@ async function resetKiosk() {
     alert(result.message);
   } catch (err) {
     alert('Failed to reset kiosk');
+  }
+}
+// Same as the F1 hotkey in OBS
+async function goToIdle() {
+  if (!confirm('Switch OBS to the Idle scene?')) return;
+
+  try {
+    const response = await fetch('/session/scene-change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scene: 'Idle' }),
+    });
+    if (!response.ok) throw new Error(response.statusText);
+  } catch (err) {
+    alert('Failed to switch to Idle');
   }
 }
     // Connection status
