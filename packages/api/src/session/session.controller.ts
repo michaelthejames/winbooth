@@ -1,7 +1,7 @@
 import {
   Controller, Post, Param, Query, Get, Body, BadRequestException, Logger, ConflictException,
 } from '@nestjs/common';
-import { IsEmail, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
 import { SessionService } from './session.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { ObsService } from '../obs/obs.service';
@@ -16,6 +16,16 @@ class StartSessionDto {
 
   @IsOptional()
   cameraIndex?: number;
+
+  /** Sent to Home Assistant with each shot; defaults to true */
+  @IsOptional()
+  @IsBoolean()
+  scary?: boolean;
+
+  /** 1 = single photo, no strip; defaults to 3 */
+  @IsOptional()
+  @IsIn([1, 3])
+  shots?: 1 | 3;
 }
 
 @Controller('session')
@@ -129,8 +139,8 @@ async resendEmail(@Param('sessionId') sessionId: string) {
   await this.deliveryService.deliver({
     name: session.name,
     email: session.email || '',
-    stripPath: session.stripPath || '',
-    processedPhotoPaths: (session as any).processedPhotoPaths || [],
+    stripPath: session.stripPath,
+    processedPhotoPaths: session.processedPhotoPaths || [],
     sessionId: session.id,
   });
   

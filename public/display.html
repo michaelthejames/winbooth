@@ -561,7 +561,7 @@ async function resetKiosk() {
     });
 
     socket.on('preview', (data) => {
-      updateSessionDisplay({ status: 'shooting', photoNumber: data.shotNumber, totalPhotos: 3 });
+      updateSessionDisplay({ status: 'shooting', photoNumber: data.shotNumber, totalPhotos: data.total ?? 3 });
     });
 
     socket.on('stateChange', (data) => {

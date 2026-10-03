@@ -26,13 +26,13 @@ Four separate processes cooperate:
 1. **PARSEC** (`parsec-server`, https://localhost:3000, self-signed cert): Node wrapper around the Canon EDSDK. The API calls it over HTTP (`/camera/`, `/camera/:i/trigger`, `/camera/:i/SaveTo`, `/camera/:i/liveView`). `camera.service.ts` sets `NODE_TLS_REJECT_UNAUTHORIZED=0` process-wide for this.
 2. **NestJS API** (`packages/api`, port 3001): orchestrates everything and also serves `public/` statically, plus capture images at `/camera/captures`.
 3. **OBS Studio**: the guest-facing display. The API drives it through obs-websocket (`obs.service.ts`) by switching scenes and setting image sources.
-4. **OBS Python script** (`packages/api/src/obs/python/kiosk-obs.py`): loaded inside OBS. It captures global keystrokes with `pynput`, renders the name/email prompt into the OBS text source `Kiosk Input`, and POSTs to `http://localhost:3001/session/start`. F5 resets it, and so does the OBS hotkey `kiosk_reset` that the script registers. The API fires that hotkey through `TriggerHotkeyByName` when someone presses the dashboard's reset button (`POST /session/reset-kiosk`).
+4. **OBS Python script** (`packages/api/src/obs/python/kiosk-obs.py`): loaded inside OBS. It captures global keystrokes with `pynput`, renders the intake screens into the OBS text source `Kiosk Input`, and POSTs `{name, email, scary, shots}` to `http://localhost:3001/session/start`. The screens are name → email → Scary/Not scary → 1 shot/3 shots. On the two choice screens, arrow keys move the focus marker, Enter selects, and Backspace/Esc go back a screen. F5 resets it, and so does the OBS hotkey `kiosk_reset` that the script registers. The API fires that hotkey through `TriggerHotkeyByName` when someone presses the dashboard's reset button (`POST /session/reset-kiosk`).
 
 ### Session flow (`session/session.service.ts`)
 
 Only one session runs at a time, guarded by the `busy` flag. `POST /session/start` returns immediately, and `runSession` continues asynchronously:
 
-open camera (SaveTo=Host) → OBS scene `Countdown` → for each of 3 shots: Home Assistant webhook, 3-2-1-"BOO!" countdown, trigger PARSEC, copy the image into `CAPTURES_DIR/<sessionId>/` → `buildStrip` (sharp: per-photo border + `assets/sign.png` logo saved as `*-processed.jpg`, plus a vertical strip in `STRIPS_DIR/<sessionId>/`) → OBS scene `Delivery` → 5s → OBS scene `Idle` → email via Resend (`delivery.service.ts`).
+open camera (SaveTo=Host) → OBS scene `Countdown` → for each shot (`session.shots`, 1 or 3, default 3): Home Assistant webhook (payload `{shot, scary, timestamp}`), 3-2-1-"BOO!" countdown, trigger PARSEC, copy the image into `CAPTURES_DIR/<sessionId>/` → `processPhotos` (sharp: per-photo border + `assets/sign.png` logo, saved as `*-processed.jpg`) → `buildStrip`, 3-shot sessions only (a vertical strip in `STRIPS_DIR/<sessionId>/`) → OBS scene `Delivery`, showing the middle (or only) processed photo in `strip-image` → 5s → OBS scene `Idle` → email via Resend (`delivery.service.ts`): the processed photos, plus the strip when there is one.
 
 Session history and the error log are kept in memory only, so they are lost on restart.
 

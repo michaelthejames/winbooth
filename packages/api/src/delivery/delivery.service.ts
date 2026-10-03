@@ -7,7 +7,7 @@ export interface DeliveryOptions {
   name: string;
   email: string;
   processedPhotoPaths: string[];
-  stripPath: string;
+  stripPath?: string; // absent for 1-shot sessions
   sessionId: string;
 }
 
@@ -41,11 +41,13 @@ export class DeliveryService {
     }
 
     // Add composited strip (with border + logo)
-  const stripBuffer = await fs.readFile(options.stripPath);
-  attachments.push({
-    filename: 'photo-strip.jpg',
-    content: stripBuffer.toString('base64'),
+  if (options.stripPath) {
+    const stripBuffer = await fs.readFile(options.stripPath);
+    attachments.push({
+      filename: 'photo-strip.jpg',
+      content: stripBuffer.toString('base64'),
     });
+  }
 
   await this.resend.emails.send({
     from: process.env.FROM_EMAIL,

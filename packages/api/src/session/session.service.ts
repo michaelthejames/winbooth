@@ -13,6 +13,8 @@ import { access } from 'fs/promises';
 // Must match the name kiosk-obs.py registers with obs_hotkey_register_frontend
 const KIOSK_RESET_HOTKEY = 'kiosk_reset';
 
+const LOGO_PATH = 'C:\\Users\\pod\\winbooth\\assets\\sign.png';
+
 // ── Session states ────────────────────────────────────────────────────────────
 export type SessionState =
   | 'idle'
@@ -28,10 +30,13 @@ export interface BoothSession {
   name: string;
   email?: string;
   shotNumber: number;
+  scary: boolean;
+  shots: 1 | 3;
   state: SessionState;
   status?: 'success' | 'error' | 'pending';
   capturedPaths: string[];
-  stripPath?: string;
+  processedPhotoPaths?: string[];
+  stripPath?: string; // 3-shot sessions only
   error?: string;
   createdAt: Date;
 }
@@ -40,6 +45,8 @@ export interface StartSessionDto {
   name: string;
   email?: string;
   cameraIndex?: number;
+  scary?: boolean;
+  shots?: 1 | 3;
 }
 
 // ─── SessionService ───────────────────────────────────────────────────────────
@@ -57,7 +64,7 @@ export class SessionService {
   message: string;
   context?: string;
 }> = [];
-private async triggerHA(shotNumber: number) {
+private async triggerHA(shotNumber: number, scary: boolean) {
   try {
     const webhookUrl = this.config.get<string>('app.homeAssistant.webhookUrl');
     
@@ -71,6 +78,7 @@ private async triggerHA(shotNumber: number) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         shot: shotNumber,
+        scary,
         timestamp: new Date().toISOString()
       })
     });
@@ -112,6 +120,8 @@ private async triggerHA(shotNumber: number) {
       capturedPaths: [],
       createdAt: new Date(),
       shotNumber: 0,
+      scary: dto.scary ?? true,
+      shots: dto.shots ?? 3,
     };
     this.activeSession = session;
     this.emit('session-started', {
@@ -173,25 +183,27 @@ private async runSession(session: BoothSession, cameraIndex: number) {
     await this.obsService.updateImageSource('photo-2', '');
     await this.obsService.updateImageSource('photo-3', '');
 
-    // 3. Shoot 3 photos with countdowns between each
-    for (let shot = 1; shot <= 3; shot++) {
-      await this.triggerHA(shot);
+    // 3. Shoot 1 or 3 photos with countdowns between each
+    for (let shot = 1; shot <= session.shots; shot++) {
+      await this.triggerHA(shot, session.scary);
       await this.runCountdown(session, shot);
       await this.takeShot(session, nativeSession, capturesDir, shot);
     }
 
-    // 4. Composite strip
+    // 4. Border + logo on each photo; 3-shot sessions also get a composited strip
     this.setState(session, 'processing');
-    const stripPath = await this.buildStrip(session, capturesDir, stripsDir);
-    session.stripPath = stripPath;
+    session.processedPhotoPaths = await this.processPhotos(session);
+    if (session.shots === 3) {
+      session.stripPath = await this.buildStrip(session, stripsDir);
+    }
 
-    // 5. Switch to Delivery scene
+    // 5. Switch to Delivery scene, showing the middle photo (or the only one)
     try {
       await this.obsService.setScene('Delivery');
-      
-      const processedPaths = (session as any).processedPhotoPaths || [];
+
+      const processedPaths = session.processedPhotoPaths;
       if (processedPaths.length > 0) {
-        const fullPath = processedPaths[1];
+        const fullPath = processedPaths[Math.floor(processedPaths.length / 2)];
         await this.obsService.updateImageSource('strip-image', fullPath);
         this.logger.log(`[OBS] Showing photo: ${fullPath}`);
       }
@@ -214,8 +226,8 @@ private async runSession(session: BoothSession, cameraIndex: number) {
     await this.deliveryService.deliver({
       name: session.name,
       email: session.email,
-      stripPath: stripPath,
-      processedPhotoPaths: (session as any).processedPhotoPaths || [],
+      stripPath: session.stripPath,
+      processedPhotoPaths: session.processedPhotoPaths,
       sessionId: session.id,
     });
 
@@ -256,7 +268,7 @@ private async runSession(session: BoothSession, cameraIndex: number) {
         sessionId: session.id,
         count,
         shotNumber,
-        total: 3,
+        total: session.shots,
       });
 
       await sleep(1000);
@@ -270,7 +282,7 @@ private async runSession(session: BoothSession, cameraIndex: number) {
       sessionId: session.id,
       count: 'BOO!',
       shotNumber,
-      total: 3,
+      total: session.shots,
     });
     try {
       await this.obsService.setScene('Countdown');
@@ -304,6 +316,7 @@ private async takeShot(
     this.emit('preview', {
       sessionId: session.id,
       shotNumber,
+      total: session.shots,
       filePath: photoUrl,
     });
 
@@ -316,46 +329,41 @@ private async takeShot(
   }
 }
 
+  // ── Photo processing ───────────────────────────────────────────────────────
+
+// Add border + logo to each captured photo and save it alongside as *-processed.jpg
+private async processPhotos(session: BoothSession): Promise<string[]> {
+  const processedPhotoPaths: string[] = [];
+  this.logger.log(`[ProcessPhotos] Processing ${session.capturedPaths.length} photos`);
+  for (let i = 0; i < session.capturedPaths.length; i++) {
+    const originalPath = session.capturedPaths[i];
+    const processedPath = originalPath.replace('.jpg', '-processed.jpg');
+    try {
+      await this.addBorderAndLogo(originalPath, processedPath, LOGO_PATH, 20, 400);
+      processedPhotoPaths.push(processedPath);
+      this.logger.log(`[ProcessPhotos] ✓ Shot ${i + 1} processed successfully`);
+    } catch (e) {
+      this.logger.error(`[ProcessPhotos] ✗ Failed to process shot ${i + 1}: ${e}`);
+      throw e;
+    }
+  }
+  return processedPhotoPaths;
+}
+
   // ── Strip compositor ───────────────────────────────────────────────────────
 
 private async buildStrip(
   session: BoothSession,
-  capturesDir: string,
   stripsDir: string,
 ): Promise<string> {
-    this.logger.log(`[BuildStrip] Starting buildStrip`);
-  this.logger.log(`[BuildStrip] Captured paths count: ${session.capturedPaths.length}`);
-  const logoPath = 'C:\\Users\\pod\\winbooth\\assets\\sign.png';
+  this.logger.log(`[BuildStrip] Compositing ${session.capturedPaths.length} photos`);
   const stripPath = path.join(stripsDir, `${session.id}-strip.jpg`);
 
   const photoWidth = 800;
   const photoHeight = 600;
   const totalHeight = photoHeight * 3;
-  
-  // STEP 1: Process individual photos - add border + logo and SAVE to disk
-  const processedPhotoPaths: string[] = [];
-    this.logger.log(`[BuildStrip] Starting loop for ${session.capturedPaths.length} photos`);
-    for (let i = 0; i < session.capturedPaths.length; i++) {
-    this.logger.log(`[BuildStrip] Loop iteration ${i}`);
-    const originalPath = session.capturedPaths[i];
-    const processedPath = originalPath.replace('.jpg', '-processed.jpg');
-    this.logger.log(`[BuildStrip] About to process: ${originalPath}`);
-    try {
-      await this.addBorderAndLogo(originalPath, processedPath, logoPath, 20, 400);
-      processedPhotoPaths.push(processedPath);
-      this.logger.log(`[BuildStrip] ✓ Shot ${i + 1} processed successfully`);
-    } catch (e) {
-      this.logger.error(`[BuildStrip] ✗ Failed to process shot ${i + 1}: ${e}`);
-      throw e;
-    }
-     this.logger.log(`[BuildStrip] Loop complete. Processed ${processedPhotoPaths.length} photos`);
-      (session as any).processedPhotoPaths = processedPhotoPaths;
-  }
-  
-  // Store processed paths in session
-  (session as any).processedPhotoPaths = processedPhotoPaths;
 
-  // STEP 2: Composite ORIGINAL photos into strip
+  // STEP 1: Composite ORIGINAL photos into strip
   const canvas = Buffer.alloc(photoWidth * totalHeight * 3);
 
   const photos = await Promise.all(
@@ -383,8 +391,8 @@ private async buildStrip(
     .jpeg({ quality: 90 })
     .toFile(stripWithoutBorder);
 
-  // STEP 3: Add border + logo to the strip
-  await this.addBorderAndLogo(stripWithoutBorder, stripPath, logoPath, 20, 150);
+  // STEP 2: Add border + logo to the strip
+  await this.addBorderAndLogo(stripWithoutBorder, stripPath, LOGO_PATH, 20, 150);
   
   // Clean up temp file
   try {
