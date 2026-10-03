@@ -21,6 +21,8 @@ SCARY_SCENE = "Scary Select"
 SCARY_OPTIONS = [("Scary Option", "SCARY"), ("Not Scary Option", "NOT SCARY")]  # stacked: Up/Down
 SHOTS_SCENE = "Shots Select"
 SHOTS_OPTIONS = [("One Shot Option", "1"), ("Three Shots Option", "3")]      # side by side: Left/Right
+# Filter on each option source, enabled only while that option is focused
+FOCUS_FILTER = "Focus"
 
 # Index of the focused option on each choice screen
 scary_focus = 0   # default: Scary
@@ -49,10 +51,25 @@ def set_scene(scene_name):
     else:
         print(f"[kiosk-obs] Scene not found: {scene_name}")
 
+def set_filter_enabled(source_name, filter_name, enabled):
+    """Show/hide a filter on a source (the eye icon in OBS's Filters window)"""
+    source = obs.obs_get_source_by_name(source_name)
+    if not source:
+        return  # set_text already logs missing sources
+    source_filter = obs.obs_source_get_filter_by_name(source, filter_name)
+    if source_filter:
+        obs.obs_source_set_enabled(source_filter, enabled)
+        obs.obs_source_release(source_filter)
+    else:
+        print(f"[kiosk-obs] Filter '{filter_name}' not found on: {source_name}")
+    obs.obs_source_release(source)
+
 def render_options(options, focus):
-    """Mark the focused option as [LABEL]; pad the others so text width stays stable"""
+    """Mark the focused option as [LABEL] and enable its Focus filter;
+    pad the others so text width stays stable"""
     for i, (source_name, label) in enumerate(options):
         set_text(source_name, f"[{label}]" if i == focus else f" {label} ")
+        set_filter_enabled(source_name, FOCUS_FILTER, i == focus)
 
 def is_scary():
     return scary_focus == 0
