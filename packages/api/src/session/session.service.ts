@@ -56,7 +56,14 @@ export class SessionService {
 }> = [];
 private async triggerHA(shotNumber: number) {
   try {
-    await fetch('http://192.168.4.227:8123/api/webhook/photobooth-scare', {
+    const webhookUrl = this.config.get<string>('app.homeAssistant.webhookUrl');
+    
+    if (!webhookUrl) {
+      this.logger.warn('[HA] Webhook URL not configured');
+      return;
+    }
+
+    await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -66,7 +73,7 @@ private async triggerHA(shotNumber: number) {
     });
     this.logger.log(`[HA] Triggered shot ${shotNumber}`);
   } catch (e) {
-    this.logger.warn(`[HA] Webhook failed`);
+    this.logger.warn(`[HA] Webhook failed: ${e}`);
   }
 }
 
